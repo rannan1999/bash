@@ -7,11 +7,11 @@ curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes
 ```
 
 ```
-curl -s https://raw.githubusercontent.com/rannan1999/all-bash/refs/heads/main/mrwang.sh | bash
+curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/mrwang.sh | bash
 ```
 
 ```
-curl -s https://raw.githubusercontent.com/rannan1999/all-bash/refs/heads/main/workes/installhn21.sh | bash
+curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/installhn21.sh | bash
 ```
 
 npm i node-sbx
