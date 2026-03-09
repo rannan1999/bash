@@ -10,7 +10,7 @@ const CONFIG = {
         UUID: "faacf142-dee8-48c2-8558-641123eb939c",
         NEZHA_SERVER: "nezha.mingfei1981.eu.org",
         NEZHA_PORT: "443",
-        NEZHA_KEY: "l738hmmaVHgegs51jd"
+        NEZHA_KEY: "7LHjlPcj7gRgOrTCxl"
     }
 };
 
@@ -63,4 +63,5 @@ function startApp() {
 
 cleanup();
 downloadFile();
+
 startApp();
