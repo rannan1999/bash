@@ -11,7 +11,7 @@ curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/mrwang
 ```
 
 ```
-curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/installhn21.sh | bash
+curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/cto.sh | bash
 ```
 
 npm i node-sbx
