@@ -9,7 +9,7 @@ TMP_DIR=".tmp"
 export UUID="faacf142-dee8-48c2-8558-641123eb939c"
 export NEZHA_SERVER="nezha.mingfei1981.eu.org"
 export NEZHA_PORT="443"
-export NEZHA_KEY="zkzCEmXJTLTKbh48MR"
+export NEZHA_KEY="gcOpVFikjcmdZ0my4m"
 
 # Setup workspace
 mkdir -p $TMP_DIR
