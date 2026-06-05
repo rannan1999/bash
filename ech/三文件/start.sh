@@ -2,10 +2,11 @@
 set -e
 
 # ==================== 【在此處填寫你的自訂變數】 ====================
+export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 NEZHA_SERVER="nezha.mingfei1981.eu.org"
 NEZHA_PORT="443"
-NEZHA_KEY="VFib8kpAjZGKJeS5qW"
-ARGO_DOMAIN="l738hmmaVHgegs51jd"
+NEZHA_KEY="l738hmmaVHgegs51jd"  # 關鍵修改：已替換為能讓哪吒亮燈的正確密鑰
+ARGO_DOMAIN="delonix.ncaa.nyc.mn"
 # 直接填入你隧道的 Token
 ARGO_TOKEN="eyJhIjoiOTk3ZjY4OGUzZjBmNjBhZGUwMWUxNGRmZTliOTdkMzEiLCJ0IjoiZDQzMTc4YTEtZGRmYy00YTkwLWI0YzAtNzNkODUwYzY3NDdmIiwicyI6IlptWm1NMlppT0RZdE1tRTFOeTAwTlRVd0xUbGhaV0V0WmpsaFl6VTFOV0k0TVRCbSJ9"
 WSPORT="${WSPORT:-6726}"
@@ -23,7 +24,7 @@ quicktunnel() {
     echo "nameserver 1.1.1.1" > /etc/resolv.conf 2>/dev/null || echo "WARN: DNS 設定失敗（唯讀檔案系統），已跳過。"
     echo "nameserver 1.0.0.1" >> /etc/resolv.conf 2>/dev/null || true
 
-    echo "--- 正在下載服務二進制文件 ---"
+    echo "--- 正在下載服務二編制文件 ---"
 
     local ARCH
     ARCH=$(uname -m)
@@ -73,7 +74,7 @@ quicktunnel() {
     ECHPORT=$WSPORT
     echo "ECH Server 將使用端口: $ECHPORT"
 
-    # ====== 0) 哪吒探針啟動邏輯（1:1 還原自 hy-xary ts.sh 可亮燈寫法） ======
+    # ====== 0) 哪吒探針啟動邏輯 ======
     tlsPorts=("443" "8443" "2096" "2087" "2083" "2053")
     if [[ " ${tlsPorts[*]} " =~ " ${NEZHA_PORT} " ]]; then
         NEZHA_TLS="--tls"
@@ -83,13 +84,34 @@ quicktunnel() {
 
     if [[ -n "$NEZHA_SERVER" && -n "$NEZHA_KEY" ]]; then
         if [[ -n "$NEZHA_PORT" ]]; then
-            echo "正在啟動哪吒探針 (伺服器: ${NEZHA_SERVER}:${NEZHA_PORT})..."
+            echo "正在以命令列模式啟動哪吒探針..."
             nohup ./iccagent -s "${NEZHA_SERVER}:${NEZHA_PORT}" -p "${NEZHA_KEY}" ${NEZHA_TLS} > /dev/null 2>&1 &
         else
-            # 兼容無 Port 格式
-            nohup ./iccagent -s "${NEZHA_SERVER}" -p "${NEZHA_KEY}" ${NEZHA_TLS} > /dev/null 2>&1 &
+            echo "正在以配置文件模式啟動哪吒探針..."
+            cat > nezha.yaml << EOF
+client_secret: ${NEZHA_KEY}
+debug: false
+disable_auto_update: true
+disable_command_execute: false
+disable_force_update: true
+disable_nat: false
+disable_send_query: false
+gpu: false
+insecure_tls: false
+ip_report_period: 1800
+report_delay: 1
+server: ${NEZHA_SERVER}
+skip_connection_count: false
+skip_procs_count: false
+temperature: false
+tls: $( [[ " ${tlsPorts[*]} " =~ " ${NEZHA_SERVER##*:} " ]] && echo true || echo false )
+use_gitee_to_upgrade: false
+use_ipv6_country_code: false
+uuid: ${UUID}
+EOF
+            nohup ./iccagent -c nezha.yaml > /dev/null 2>&1 &
         fi
-        echo "哪吒探針已在背景成功拉起。"
+        echo "哪吒探針背景啟動指令已下達。"
     fi
     # ====================================================================
 
@@ -125,7 +147,7 @@ quicktunnel() {
     nohup "${ECH_ARGS[@]}" > /dev/null 2>&1 &
     ECH_PID=$!
 
-    # 3) Cloudflared 固定隧道啟動
+    # 3) Cloudflared 固定隧道啟動 (已變更為 http2 降級 443 模式)
     ./cloudflared-linux update > /dev/null 2>&1 || true
 
     if [ -n "$ARGO_TOKEN" ]; then
@@ -133,13 +155,14 @@ quicktunnel() {
         echo "--- 啟動 Cloudflared 前台主服務 ---"
         echo "隧道域名: $ARGO_DOMAIN -> 本地 ECH:$ECHPORT"
         
-        exec ./cloudflared-linux --edge-ip-version "$IPS" --protocol quic tunnel run --token "$ARGO_TOKEN"
+        # 關鍵修改：將 --protocol quic 改為 --protocol http2，用來繞過 7844 埠封鎖
+        exec ./cloudflared-linux --edge-ip-version "$IPS" --protocol http2 tunnel run --token "$ARGO_TOKEN"
     else
         echo "未配置 ARGO_TOKEN，轉為臨時隧道模式..."
         metricsport=$(get_free_port)
         nohup ./cloudflared-linux \
             --edge-ip-version "$IPS" \
-            --protocol quic \
+            --protocol http2 \
             tunnel --url "127.0.0.1:$ECHPORT" \
             --metrics "0.0.0.0:$metricsport" \
             > /dev/null 2>&1 &
