@@ -11,13 +11,13 @@ PORT = int(os.environ.get("PORT", 3000))  # Python 本身的 HTTP 監聽埠
 
 NEZHA_SERVER = os.environ.get("NEZHA_SERVER", "nezha.mingfei1981.eu.org")
 NEZHA_PORT = os.environ.get("NEZHA_PORT", "443")
-NEZHA_KEY = os.environ.get("NEZHA_KEY", "VFib8kpAjZGKJeS5qW")
+NEZHA_KEY = os.environ.get("NEZHA_KEY", "96p44lsGGMTYPJc7aD")
 
-ARGO_DOMAIN = os.environ.get("ARGO_DOMAIN", "nf-nl.mingfei1982.eu.org")
+ARGO_DOMAIN = os.environ.get("ARGO_DOMAIN", "zira.prosinecki.hidns.co")
 # 直接填入你的 Argo 隧道 Token
-ARGO_TOKEN = os.environ.get("ARGO_TOKEN", "eyJhIjoiMGYxNTA1MzUwOTRjNDhlZjNmM2ZjZTA2M2E4N2M1N2YiLCJ0IjoiMjRkNGZmZGMtZTc2ZS00MjU0LWI1ODgtYzNiNzIwZjZjZGIwIiwicyI6IllUVmpZV1JpWW1FdE5EYzNOaTAwTkRsaExXRTVOVEF0T0RJME5UTmtNVE00WkRVNSJ9")
+ARGO_TOKEN = os.environ.get("ARGO_TOKEN", "eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiODViODFiNzYtMGU1OC00OTU0LWEyMDUtMWY5YzUyMDI2NTBkIiwicyI6IlpXUmxNR1ZoTW1JdFltRTRNaTAwTTJNMUxUZzBNbUV0WTJObU0ySTJOelZpWlRWaSJ9")
 
-WSPORT = os.environ.get("WSPORT", "10264")  # 主要服務通訊埠
+WSPORT = os.environ.get("WSPORT", "27328")  # 主要服務通訊埠
 TOKEN = os.environ.get("TOKEN", "babama123")  # ECH Server 密鑰
 OPERA = os.environ.get("OPERA", "0")
 IPS = os.environ.get("IPS", "4")
@@ -57,6 +57,12 @@ def download_file(url, dest):
 def log_pipe(stream):
     for line in iter(stream.readline, ""):
         sys.stdout.write(line)
+        sys.stdout.flush()
+
+# 專門監聽哪吒探針日誌的函式
+def log_nezha(stream):
+    for line in iter(stream.readline, ""):
+        sys.stdout.write(f"[Nezha Log] {line}")
         sys.stdout.flush()
 
 # 主啟動邏輯
@@ -100,21 +106,33 @@ def start_core_services():
 
     print("--- 正在背景啟動各項主服務 ---")
 
-    # 1) 啟動哪吒探針 (帶有 TLS 埠自動校驗邏輯)
+    # 1) 啟動哪吒探針 (採用原生 Popen 背景化，並導出日誌進行除錯)
     if os.path.exists("./iccagent") and NEZHA_SERVER and NEZHA_KEY:
         tls_ports = ["443", "8443", "2096", "2087", "2083", "2053"]
-        nezha_tls = "--tls" if str(NEZHA_PORT) in tls_ports else ""
         
-        print(f"[Python Wrapper] 正在啟動哪吒探針 (伺服器: {NEZHA_SERVER}:{NEZHA_PORT})...")
+        # 建立乾淨的指令參數列表
+        nezha_cmd = ["./iccagent", "-s", f"{NEZHA_SERVER}:{NEZHA_PORT}" if NEZHA_PORT else NEZHA_SERVER, "-p", NEZHA_KEY]
+        if str(NEZHA_PORT) in tls_ports:
+            nezha_cmd.append("--tls")
+            
+        print(f"[Python Wrapper] 正在啟動哪吒探針... 指令: {' '.join(nezha_cmd)}")
         
-        if NEZHA_PORT:
-            nezha_cmd = f"exec ./iccagent -s {NEZHA_SERVER}:{NEZHA_PORT} -p {NEZHA_KEY} {nezha_tls}"
-        else:
-            nezha_cmd = f"exec ./iccagent -s {NEZHA_SERVER} -p {NEZHA_KEY} {nezha_tls}"
-
-        # 在 Python 中使用 Popen 並配合 nohup 邏輯異步背景執行
-        subprocess.Popen(f"nohup {nezha_cmd} > /dev/null 2>&1 &", shell=True)
-        print("[Python Wrapper] 哪吒探針已在背景拉起。")
+        try:
+            # 透過原生不阻斷方式在背景執行，並捕獲日誌
+            nezha_process = subprocess.Popen(
+                nezha_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            # 建立獨立執行緒讀取哪吒日誌，防阻塞
+            threading.Thread(target=log_nezha, args=(nezha_process.stdout,), daemon=True).start()
+            print("[Python Wrapper] 哪吒探針已在背景拉起。")
+        except Exception as e:
+            print(f"[Python Wrapper] 哪吒探針啟動失敗，錯誤原因: {e}")
+    else:
+        print("[Python Wrapper] 提示: 哪吒探針主程式不存在或變數未填寫，跳過啟動。")
 
     # 2) 啟動 Opera Proxy
     opera_port = random.randint(10000, 30000)
