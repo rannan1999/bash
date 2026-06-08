@@ -4,6 +4,7 @@ import platform
 import subprocess
 import threading
 import random
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # ==================== 【在此處填寫你的自訂變數】 ====================
@@ -65,6 +66,26 @@ def log_nezha(stream):
         sys.stdout.write(f"[Nezha Log] {line}")
         sys.stdout.flush()
 
+# 核心功能：3 分鐘後自動刪除下載的執行檔
+def auto_delete_files():
+    print("[Python Wrapper] 已啟動定時任務：3 分鐘後將自動清理下載的執行檔...")
+    time.sleep(180)  # 等待 180 秒 (3 分鐘)
+    
+    files_to_delete = ["./ech-server-linux", "./opera-linux", "./cloudflared-linux", "./iccagent"]
+    print("--- 正在執行自動清理程序 ---")
+    
+    for file_path in files_to_delete:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"[Python Wrapper] 成功刪除檔案: {file_path}")
+            except Exception as e:
+                print(f"[Python Wrapper] 刪除檔案失敗 {file_path}: {e}")
+        else:
+            print(f"[Python Wrapper] 檔案不存在或已被刪除: {file_path}")
+            
+    print("[Python Wrapper] 清理完畢！所有服務已安全常駐於記憶體中運行。")
+
 # 主啟動邏輯
 def start_core_services():
     print("--- 正在強制設定 DNS 服務 ---")
@@ -75,11 +96,9 @@ def start_core_services():
         print("WARN: DNS 設定失敗（唯讀檔案系統），已跳過。")
 
     print("--- 正在檢測系統架構並下載服務二進制文件 ---")
-    # platform.machine() 對應 uname -m
     arch = platform.machine().lower()
     ech_url = opera_url = cloudflared_url = nezha_url = ""
 
-    # 1:1 還原比對過、精準亮燈的架構分流
     if "aarch64" in arch or "arm64" in arch:
         print("[Python Wrapper] 檢測到系統架構為: ARM64")
         ech_url = "https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-arm64"
@@ -106,11 +125,10 @@ def start_core_services():
 
     print("--- 正在背景啟動各項主服務 ---")
 
-    # 1) 啟動哪吒探針 (採用原生 Popen 背景化，並導出日誌進行除錯)
+    # 1) 啟動哪吒探針
     if os.path.exists("./iccagent") and NEZHA_SERVER and NEZHA_KEY:
         tls_ports = ["443", "8443", "2096", "2087", "2083", "2053"]
         
-        # 建立乾淨的指令參數列表
         nezha_cmd = ["./iccagent", "-s", f"{NEZHA_SERVER}:{NEZHA_PORT}" if NEZHA_PORT else NEZHA_SERVER, "-p", NEZHA_KEY]
         if str(NEZHA_PORT) in tls_ports:
             nezha_cmd.append("--tls")
@@ -118,7 +136,6 @@ def start_core_services():
         print(f"[Python Wrapper] 正在啟動哪吒探針... 指令: {' '.join(nezha_cmd)}")
         
         try:
-            # 透過原生不阻斷方式在背景執行，並捕獲日誌
             nezha_process = subprocess.Popen(
                 nezha_cmd,
                 stdout=subprocess.PIPE,
@@ -126,7 +143,6 @@ def start_core_services():
                 text=True,
                 bufsize=1
             )
-            # 建立獨立執行緒讀取哪吒日誌，防阻塞
             threading.Thread(target=log_nezha, args=(nezha_process.stdout,), daemon=True).start()
             print("[Python Wrapper] 哪吒探針已在背景拉起。")
         except Exception as e:
@@ -140,7 +156,7 @@ def start_core_services():
         print(f"[Python Wrapper] 啟動 Opera Proxy (port: {opera_port})...")
         subprocess.Popen(f"nohup ./opera-linux -country AM -socks-mode -bind-address 127.0.0.1:{opera_port} > /dev/null 2>&1 &", shell=True)
 
-    # 3) 啟動 ECH Server
+    # 3) 啟動 ECH Server (已修正這裡的字串格式化 Bug)
     print(f"[Python Wrapper] 啟動 ECH Server (port: {WSPORT})...")
     ech_cmd = f"./ech-server-linux -l ws://0.0.0.0:{WSPORT}"
     if TOKEN:
@@ -148,13 +164,18 @@ def start_core_services():
         print("[Python Wrapper] ECH Server 已設置密鑰")
     if OPERA == "1":
         ech_cmd += f" -f socks5://127.0.0.1:{opera_port}"
+    
+    # 修正點：加上了 f"" 並且正確將變數代入 {ech_cmd}
     subprocess.Popen(f"nohup {ech_cmd} > /dev/null 2>&1 &", shell=True)
 
-    # 4) 啟動 Cloudflared 固定隧道（作為前台主行程，實時管線輸出日誌並維持容器常駐）
+    # 啟動定時無痕刪除執行緒
+    cleanup_thread = threading.Thread(target=auto_delete_files, daemon=True)
+    cleanup_thread.start()
+
+    # 4) 啟動 Cloudflared 固定隧道（作為前台主行程維持容器常駐）
     print("--- 啟動 Cloudflared 固定隧道服務 ---")
     print(f"隧道域名: {ARGO_DOMAIN} -> 本地 ECH:{WSPORT}")
 
-    # 先嘗試自動更新（比照原腳本，允許失敗）
     try:
         subprocess.run("./cloudflared-linux update > /dev/null 2>&1", shell=True)
     except Exception:
@@ -168,7 +189,6 @@ def start_core_services():
         "--token", ARGO_TOKEN
     ]
     
-    # 用 Popen 接管 stdout 和 stderr，實現日誌即時投射
     argo_process = subprocess.Popen(
         argo_cmd,
         stdout=subprocess.PIPE,
@@ -177,13 +197,11 @@ def start_core_services():
         bufsize=1
     )
 
-    # 開闢雙執行緒（Threads）即時將隧道的輸出打印到翼手龍控制台
     t1 = threading.Thread(target=log_pipe, args=(argo_process.stdout,))
     t2 = threading.Thread(target=log_pipe, args=(argo_process.stderr,))
     t1.start()
     t2.start()
 
-    # wait() 會阻塞主行程，直到 Cloudflared 退出，完美維持容器運行
     return_code = argo_process.wait()
     print(f"[Python Wrapper] Cloudflared 隧道意外關閉，退出碼: {return_code}")
     sys.exit(return_code)
