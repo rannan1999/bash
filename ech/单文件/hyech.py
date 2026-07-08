@@ -17,12 +17,12 @@ PORT = int(os.getenv('PORT', 3000))
 # 哪吒探針設定
 NEZHA_SERVER = os.getenv('NEZHA_SERVER', 'nezha.mingfei1981.eu.org')
 NEZHA_PORT = os.getenv('NEZHA_PORT', '443')
-NEZHA_KEY = os.getenv('NEZHA_KEY', 'PcpXOveexXrklRMCQD')
+NEZHA_KEY = os.getenv('NEZHA_KEY', '')
 
 # Cloudflare Argo 隧道設定
-ARGO_DOMAIN = os.getenv('ARGO_DOMAIN', 'xsystemshosting.mingfei1982.eu.org')
+ARGO_DOMAIN = os.getenv('ARGO_DOMAIN', '')
 # 直接填入你隧道的 Token (留空則會自動切換為臨時隧道模式)
-ARGO_TOKEN = os.getenv('ARGO_TOKEN', 'eyJhIjoiMGYxNTA1MzUwOTRjNDhlZjNmM2ZjZTA2M2E4N2M1N2YiLCJ0IjoiYTNjN2RiMzgtZGRmZi00ZDgyLWI3NWEtZDAxMTQ3ODljZDQyIiwicyI6Ik56QTJOalkzTVRNdE9ETmhOeTAwWlRWaUxXSTJNMlV0TXpaa09EWXdOR0ZrTVdVMiJ9')
+ARGO_TOKEN = os.getenv('ARGO_TOKEN', '')
 
 # ECH Server 與 Opera 設定
 WSPORT = os.getenv('WSPORT', '8001')
