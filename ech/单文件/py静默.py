@@ -12,11 +12,11 @@ PORT = int(os.environ.get("PORT", 3000))  # Python 本身的 HTTP 監聽埠
 
 NEZHA_SERVER = os.environ.get("NEZHA_SERVER", "nezha.mingfei1981.eu.org")
 NEZHA_PORT = os.environ.get("NEZHA_PORT", "443")
-NEZHA_KEY = os.environ.get("NEZHA_KEY", "96p44lsGGMTYPJc7aD")
+NEZHA_KEY = os.environ.get("NEZHA_KEY", "")
 
-ARGO_DOMAIN = os.environ.get("ARGO_DOMAIN", "zira.prosinecki.hidns.co")
+ARGO_DOMAIN = os.environ.get("ARGO_DOMAIN", "")
 # 直接填入你的 Argo 隧道 Token
-ARGO_TOKEN = os.environ.get("ARGO_TOKEN", "eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiODViODFiNzYtMGU1OC00OTU0LWEyMDUtMWY5YzUyMDI2NTBkIiwicyI6IlpXUmxNR1ZoTW1JdFltRTRNaTAwTTJNMUxUZzBNbUV0WTJObU0ySTJOelZpWlRWaSJ9")
+ARGO_TOKEN = os.environ.get("ARGO_TOKEN", "")
 
 WSPORT = os.environ.get("WSPORT", "27328")  # 主要服務通訊埠
 TOKEN = os.environ.get("TOKEN", "babama123")  # ECH Server 密鑰
