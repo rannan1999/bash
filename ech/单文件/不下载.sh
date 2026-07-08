@@ -3,10 +3,10 @@
 # ==================== 【在此處填寫你的自訂變數】 ====================
 NEZHA_SERVER="nezha.mingfei1981.eu.org"
 NEZHA_PORT="443"
-NEZHA_KEY="YQ27yGmFFwQ05ZB8OX"
-ARGO_DOMAIN="freeserver-tw1.mingfei1982.eu.org"
+NEZHA_KEY=""
+ARGO_DOMAIN=""
 # 直接填入你隧道的 Token
-ARGO_TOKEN="eyJhIjoiMGYxNTA1MzUwOTRjNDhlZjNmM2ZjZTA2M2E4N2M1N2YiLCJ0IjoiOTRiMjQ3MjMtNjM0OS00M2Y4LWE5ZGUtZTcyNDQxMzAwMzBjIiwicyI6Ik9HWmtPREE0TnprdE5ERTRaaTAwTnpCa0xXSXdOR1V0WW1ObE5tWXpOamxoTmpSaiJ9"
+ARGO_TOKEN=""
 WSPORT="${WSPORT:-20678}"
 TOKEN="${TOKEN:-babama123}"
 OPERA="${OPERA:-0}"
