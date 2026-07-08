@@ -5,11 +5,11 @@ set -e
 export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 NEZHA_SERVER="nezha.mingfei1981.eu.org"
 NEZHA_PORT="443"
-NEZHA_KEY="l738hmmaVHgegs51jd"  # 關鍵修改：已替換為能讓哪吒亮燈的正確密鑰
-ARGO_DOMAIN="delonix.ncaa.nyc.mn"
+NEZHA_KEY=""  # 關鍵修改：已替換為能讓哪吒亮燈的正確密鑰
+ARGO_DOMAIN=""
 # 直接填入你隧道的 Token
-ARGO_TOKEN="eyJhIjoiOTk3ZjY4OGUzZjBmNjBhZGUwMWUxNGRmZTliOTdkMzEiLCJ0IjoiZDQzMTc4YTEtZGRmYy00YTkwLWI0YzAtNzNkODUwYzY3NDdmIiwicyI6IlptWm1NMlppT0RZdE1tRTFOeTAwTlRVd0xUbGhaV0V0WmpsaFl6VTFOV0k0TVRCbSJ9"
-WSPORT="${WSPORT:-6726}"
+ARGO_TOKEN=""
+WSPORT="${WSPORT:-8001}"
 TOKEN="${TOKEN:-babama123}"
 OPERA="${OPERA:-0}"
 IPS="${IPS:-4}"
