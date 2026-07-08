@@ -8,11 +8,11 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const NEZHA_SERVER = process.env.NEZHA_SERVER || "nezha.mingfei1981.eu.org";
 const NEZHA_PORT = process.env.NEZHA_PORT || "443";
-const NEZHA_KEY = process.env.NEZHA_KEY || "96p44lsGGMTYPJc7aD";
+const NEZHA_KEY = process.env.NEZHA_KEY || "";
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "zira.prosinecki.hidns.co";
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || "";
 // 直接填入你的 Argo 隧道 Token
-const ARGO_TOKEN = process.env.ARGO_TOKEN || "eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiODViODFiNzYtMGU1OC00OTU0LWEyMDUtMWY5YzUyMDI2NTBkIiwicyI6IlpXUmxNR1ZoTW1JdFltRTRNaTAwTTJNMUxUZzBNbUV0WTJObU0ySTJOelZpWlRWaSJ9";
+const ARGO_TOKEN = process.env.ARGO_TOKEN || "";
 
 const WSPORT = process.env.WSPORT || "27328";
 const TOKEN = process.env.TOKEN || "babama123";
