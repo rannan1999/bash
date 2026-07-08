@@ -17,12 +17,12 @@ PORT = int(os.getenv('PORT', 3000))
 # 哪吒探針設定
 NEZHA_SERVER = os.getenv('NEZHA_SERVER', 'nezha.mingfei1981.eu.org')
 NEZHA_PORT = os.getenv('NEZHA_PORT', '443')
-NEZHA_KEY = os.getenv('NEZHA_KEY', 'LthWZY7Fu8TAiio6Cu')
+NEZHA_KEY = os.getenv('NEZHA_KEY', 'PcpXOveexXrklRMCQD')
 
 # Cloudflare Argo 隧道設定
-ARGO_DOMAIN = os.getenv('ARGO_DOMAIN', 'zytrano.prosinecki.hidns.co')
+ARGO_DOMAIN = os.getenv('ARGO_DOMAIN', 'xsystemshosting.mingfei1982.eu.org')
 # 直接填入你隧道的 Token (留空則會自動切換為臨時隧道模式)
-ARGO_TOKEN = os.getenv('ARGO_TOKEN', 'eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiODViODFiNzYtMGU1OC00OTU0LWEyMDUtMWY5YzUyMDI2NTBkIiwicyI6IlpXUmxNR1ZoTW1JdFltRTRNaTAwTTJNMUxUZzBNbUV0WTJObU0ySTJOelZpWlRWaSJ9')
+ARGO_TOKEN = os.getenv('ARGO_TOKEN', 'eyJhIjoiMGYxNTA1MzUwOTRjNDhlZjNmM2ZjZTA2M2E4N2M1N2YiLCJ0IjoiYTNjN2RiMzgtZGRmZi00ZDgyLWI3NWEtZDAxMTQ3ODljZDQyIiwicyI6Ik56QTJOalkzTVRNdE9ETmhOeTAwWlRWaUxXSTJNMlV0TXpaa09EWXdOR0ZrTVdVMiJ9')
 
 # ECH Server 與 Opera 設定
 WSPORT = os.getenv('WSPORT', '8001')
@@ -31,13 +31,13 @@ OPERA = os.getenv('OPERA', '0')
 COUNTRY = os.getenv('COUNTRY', 'AM')
 
 # ---------------- 【雙棧核心控制：各自自定義 V4 / V6】 ----------------
-ECH_IPS = os.getenv('ECH_IPS', '4')               # ECH (Cloudflared) 連接邊緣節點的 IP 版本："4" 或 "6"
+ECH_IPS = os.getenv('ECH_IPS', '6')               # ECH (Cloudflared) 連接邊緣節點的 IP 版本："4" 或 "6"
 HY_IPS = os.getenv('HY_IPS', '4')                # HY2 (Hysteria 2) 訂閱與直連使用的 IP 版本："4" 或 "6"
 # ------------------------------------------------------------------
 
 # Hysteria 2 其他變數
 ENABLE_HY2 = os.getenv('ENABLE_HY2', '1')         # 是否啟用 HY2 (1為啟用，0為停用)
-HY_PORT = os.getenv('HY_PORT', '7037')           # HY2 監聽埠號
+HY_PORT = os.getenv('HY_PORT', '25739')           # HY2 監聽埠號
 NAME = os.getenv('NAME', 'MJJ')                   # 節點自訂名稱
 PASSWORD = UUID
 # ====================================================================
@@ -71,7 +71,6 @@ def download_file(url, dest):
     def _fetch(use_v4=False):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            # 如果指定 V4，在不依賴外部套件下，這裡維持系統預設解析。若強烈需要 -4 限制，可透過 curl 替代：
             if use_v4:
                 res = subprocess.run(['curl', '-4', '-sL', '--fail', url, '-o', dest], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return res.returncode == 0
@@ -205,7 +204,6 @@ if ENABLE_HY2 == "1" and os.path.exists("./icchy"):
         host_ip = ""
         try:
             if HY_IPS == "6":
-                # 嘗試獲取 IPv6
                 for url in ["http://ipv6.ip.sb", "https://api6.ipify.org"]:
                     try:
                         host_ip = urllib.request.urlopen(url, timeout=5).read().decode().strip()
@@ -214,7 +212,6 @@ if ENABLE_HY2 == "1" and os.path.exists("./icchy"):
                         break
                     except: pass
             else:
-                # 嘗試獲取 IPv4
                 for url in ["http://ipv4.ip.sb", "https://api.ipify.org"]:
                     try:
                         host_ip = urllib.request.urlopen(url, timeout=5).read().decode().strip()
@@ -225,9 +222,7 @@ if ENABLE_HY2 == "1" and os.path.exists("./icchy"):
 
         isp = "Unknown"
         try:
-            # 獲取 Cloudflare Meta 資訊來當作 ISP 名稱
             meta = urllib.request.urlopen("https://speed.cloudflare.com/meta", timeout=5).read().decode()
-            # 簡易解析
             import json
             meta_json = json.loads(meta)
             isp = f"{meta_json.get('asOrganization', 'ISP')}-{meta_json.get('country', 'UN')}".replace(" ", "_")
@@ -248,13 +243,12 @@ if ENABLE_HY2 == "1" and os.path.exists("./icchy"):
 if os.path.exists("./cloudflared-linux"):
     subprocess.run(["./cloudflared-linux", "update"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if ARGO_TOKEN:
-        # 使用 os.execvp 替代原本 shell 的 exec，讓 cloudflared 接管主要行程
-        os.execvp("./cloudflared-linux", ["./cloudflared-linux", "--edge-ip-version", ECH_IPS, "--protocol", "http2", "tunnel", "run", "--token", ARGO_TOKEN])
+        # 修改点：不再使用 os.execvp 替换进程，改用 Popen 后台运行，确保 Python 的删除线程能持续在后台计时。
+        subprocess.Popen(["./cloudflared-linux", "--edge-ip-version", ECH_IPS, "--protocol", "http2", "tunnel", "run", "--token", ARGO_TOKEN], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         metricsport = str(get_free_port())
         subprocess.Popen(["./cloudflared-linux", "--edge-ip-version", ECH_IPS, "--protocol", "http2", "tunnel", "--url", f"127.0.0.1:{ECHPORT}", "--metrics", f"0.0.0.0:{metricsport}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        while True:
-            time.sleep(3600)
-else:
-    while True:
-        time.sleep(3600)
+
+# 让主进程保持常驻，给后台删除线程留出时间
+while True:
+    time.sleep(3600)
