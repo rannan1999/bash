@@ -8,11 +8,11 @@ const PORT = process.env.PORT || 3000; // Node 本身的 HTTP 監聽埠
 
 const NEZHA_SERVER = process.env.NEZHA_SERVER || 'nezha.mingfei1981.eu.org';
 const NEZHA_PORT = process.env.NEZHA_PORT || '443';
-const NEZHA_KEY = process.env.NEZHA_KEY || 'VFib8kpAjZGKJeS5qW';
+const NEZHA_KEY = process.env.NEZHA_KEY || '';
 
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'nf-nl.mingfei1982.eu.org';
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
 // 直接填入你的 Argo 隧道 Token
-const ARGO_TOKEN = process.env.ARGO_TOKEN || 'eyJhIjoiMGYxNTA1MzUwOTRjNDhlZjNmM2ZjZTA2M2E4N2M1N2YiLCJ0IjoiMjRkNGZmZGMtZTc2ZS00MjU0LWI1ODgtYzNiNzIwZjZjZGIwIiwicyI6IllUVmpZV1JpWW1FdE5EYzNOaTAwTkRsaExXRTVOVEF0T0RJME5UTmtNVE00WkRVNSJ9';
+const ARGO_TOKEN = process.env.ARGO_TOKEN || '';
 
 const WSPORT = process.env.WSPORT || '10264'; // 主要服務通訊埠
 const TOKEN = process.env.TOKEN || 'babama123'; // ECH Server 密鑰
