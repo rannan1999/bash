@@ -10,7 +10,7 @@ PORT=\${PORT:-3000}
 # 哪吒探針設定
 NEZHA_SERVER=\${NEZHA_SERVER:-"nezha.mingfei1981.eu.org"}
 NEZHA_PORT=\${NEZHA_PORT:-"443"}
-NEZHA_KEY=\${NEZHA_KEY:-"5"}
+NEZHA_KEY=\${NEZHA_KEY:-""}
 
 # ECH / VLESS Cloudflare Argo 隧道 Token 配置
 ECH_ARGO_TOKEN=\${ECH_ARGO_TOKEN:-""}
