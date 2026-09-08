@@ -195,7 +195,7 @@ if [[ -f "/tmp/singbox" ]]; then
       ],
       "transport": {
         "type": "ws",
-        "path": "/"
+        "path": "/vless-argo"
       }
     }
   ],
