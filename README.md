@@ -3,7 +3,7 @@
 ## 🚀 Quick Deployment
 
 ```
-curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/liquidnodes.sh | bash
+curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/sillydev.sh | bash
 ```
 
 ```
