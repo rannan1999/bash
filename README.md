@@ -7,7 +7,7 @@ curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes
 ```
 
 ```
-curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/mrwang.sh | bash
+curl -s https://raw.githubusercontent.com/rannan1999/bash/refs/heads/main/workes/sillydevne.sh | bash
 ```
 
 ```
