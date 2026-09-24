@@ -26,9 +26,19 @@ start_script
 # Handle process termination to clean up
 trap 'kill 0' SIGINT
 
-# Simple HTTP server using netcat (nc)
-while true; do
-  {
-    echo -e "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nServer is running"
-  } | nc -l -p "${PORT}"
-done
+# Simple HTTP server using Python 3 socket
+python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(('0.0.0.0', ${PORT}))
+s.listen(5)
+while True:
+    try:
+        conn, addr = s.accept()
+        conn.recv(1024)
+        conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nServer is running')
+        conn.close()
+    except Exception:
+        pass
+"
