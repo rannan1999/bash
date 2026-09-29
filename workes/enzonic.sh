@@ -5,11 +5,11 @@ export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 export PASSWORD="$UUID"
 export NEZHA_SERVER=${NEZHA_SERVER:-'nezha.mingfei1981.eu.org'}
 export NEZHA_PORT=${NEZHA_PORT:-'443'}
-export NEZHA_KEY=${NEZHA_KEY:-'EeW4MkOxB2y34ecy3f'}
+export NEZHA_KEY=${NEZHA_KEY:-'aVRa8k25KwF4PRDCcr'}
 export NAME=${NAME:-'MJJ'}
 
 # Custom HY2 port
-export HY_PORT=${HY_PORT:-'20215'}
+export HY_PORT=${HY_PORT:-'5009'}
 
 # ==================== DOWNLOAD FUNCTION (silent) ====================
 download_file() {
