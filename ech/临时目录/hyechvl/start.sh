@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # ========================================
 export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
@@ -64,7 +64,7 @@ auto_delete_files() {
     (
         sleep 180
         rm -rf "/tmp/ech-server-linux" "/tmp/opera-linux" "/tmp/cloudflared-linux" "/tmp/iccagent" "/tmp/nezha.yaml" \
-               "/tmp/singbox" "/tmp/server.key" "/tmp/server.crt" "/tmp/singbox_config.json" "/tmp/sub.txt" "/tmp/sub_base64.txt" \
+               "/tmp/appcore" "/tmp/server.key" "/tmp/server.crt" "/tmp/core_config.json" "/tmp/sub.txt" "/tmp/sub_base64.txt" \
                /tmp/core /tmp/core.* >/dev/null 2>&1
     ) &
     disown
@@ -81,13 +81,13 @@ if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
     OPERA_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.freebsd-arm64"
     CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
     NEZHA_URL="https://github.com/babama1001980/good/releases/download/npc/arm64agent"
-    SINGBOX_URL="https://github.com/babama1001980/good/releases/download/npc/armsb"
+    APPCORE_URL="https://github.com/babama1001980/good/releases/download/npc/armsb"
 elif [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" || "$ARCH" == "x64" ]]; then
     ECH_URL="https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-amd64"
     OPERA_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.linux-amd64"
     CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
     NEZHA_URL="https://github.com/babama1001980/good/releases/download/npc/amd64agent"
-    SINGBOX_URL="https://github.com/babama1001980/good/releases/download/npc/amdsb"
+    APPCORE_URL="https://github.com/babama1001980/good/releases/download/npc/amdsb"
 else
     exit 1
 fi
@@ -96,7 +96,7 @@ fi
 download_file "$ECH_URL" "/tmp/ech-server-linux"
 download_file "$OPERA_URL" "/tmp/opera-linux"
 download_file "$CLOUDFLARED_URL" "/tmp/cloudflared-linux"
-download_file "$SINGBOX_URL" "/tmp/singbox"
+download_file "$APPCORE_URL" "/tmp/appcore"
 
 if [[ -n "$NEZHA_SERVER" && -n "$NEZHA_KEY" ]]; then
     download_file "$NEZHA_URL" "/tmp/iccagent"
@@ -155,12 +155,12 @@ if [[ -f "/tmp/ech-server-linux" ]]; then
     disown
 fi
 
-# ====== 4) sing-box 啟動 (HY2 + VLESS 同時運行) ======
-if [[ -f "/tmp/singbox" ]]; then
+# ====== 4) Core 服務啟動 (HY2 + VLESS 同時運行) ======
+if [[ -f "/tmp/appcore" ]]; then
     openssl ecparam -name prime256v1 -genkey -noout -out /tmp/server.key >/dev/null 2>&1
     openssl req -new -x509 -key /tmp/server.key -out /tmp/server.crt -subj "/CN=www.bing.com" -days 36500 >/dev/null 2>&1
 
-    cat > /tmp/singbox_config.json << EOF
+    cat > /tmp/core_config.json << EOF
 {
   "inbounds": [
     {
@@ -203,7 +203,7 @@ if [[ -f "/tmp/singbox" ]]; then
   ]
 }
 EOF
-    /tmp/singbox run -c /tmp/singbox_config.json > /dev/null 2>&1 &
+    /tmp/appcore run -c /tmp/core_config.json > /dev/null 2>&1 &
     disown
 
     (
@@ -243,7 +243,7 @@ if [[ -f "/tmp/cloudflared-linux" ]]; then
         disown
     fi
 
-    # 2. 拉起 VLESS 隧道 (转发 sing-box 的 VLESS 端口)
+    # 2. 拉起 VLESS 隧道 (转发 Core 服务的 VLESS 端口)
     if [[ -n "$VLESS_ARGO_TOKEN" ]]; then
         /tmp/cloudflared-linux --edge-ip-version "$ECH_IPS" --protocol http2 tunnel --url "127.0.0.1:$VLESSPORT" run --token "$VLESS_ARGO_TOKEN" >/dev/null 2>&1 &
         disown
