@@ -4,46 +4,46 @@
 export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 PORT=${PORT:-3000}
 
-# 哪吒探針設定
-NEZHA_SERVER=${NEZHA_SERVER:-"nezha.mingfei1981.eu.org"}
-NEZHA_PORT=${NEZHA_PORT:-"443"}
-NEZHA_KEY=${NEZHA_KEY:-""}
+# 监控代理配置
+MONITOR_SERVER=${MONITOR_SERVER:-"monitor.example.com"}
+MONITOR_PORT=${MONITOR_PORT:-"443"}
+MONITOR_KEY=${MONITOR_KEY:-""}
 
-# ECH / VLESS Cloudflare Argo 隧道 Token 配置
-ECH_ARGO_TOKEN=${ECH_ARGO_TOKEN:-""}
-VLESS_ARGO_TOKEN=${VLESS_ARGO_TOKEN:-""}
+# 隧道 Token 配置
+TUNNEL_TOKEN_A=${TUNNEL_TOKEN_A:-""}
+TUNNEL_TOKEN_B=${TUNNEL_TOKEN_B:-""}
 
-# ECH Server 與 Opera 設定
+# 基础端口与代理配置
 WSPORT=${WSPORT:-"8001"}
 VLPORT=${VLPORT:-"8002"}
 TOKEN=${TOKEN:-"babama123"}
-OPERA=${OPERA:-"0"}
+PROXY_ENABLED=${PROXY_ENABLED:-"0"}
 COUNTRY=${COUNTRY:-"AM"}
 
-# ---------------- 【雙棧核心控制：各自自定義 V4 / V6】 ----------------
-ECH_IPS=${ECH_IPS:-"4"}               # ECH (Cloudflared) 連接邊緣節點的 IP 版本："4" 或 "6"
-HY_IPS=${HY_IPS:-"4"}                # HY2 (Hysteria 2) 訂閱與直連使用的 IP 版本："4" 或 "6"
-# ------------------------------------------------------------------
+# ---------------- 【双栈控制配置】 ----------------
+TUNNEL_IPS=${TUNNEL_IPS:-"4"}            # 隧道连接边缘节点 IP 版本："4" 或 "6"
+NODE_IPS=${NODE_IPS:-"4"}              # 节点连接 IP 版本："4" 或 "6"
+# --------------------------------------------------
 
-# Hysteria 2 / VLESS 其他變數
-ENABLE_HY2=${ENABLE_HY2:-"1"}           # 是否啟用 HY2 (1為啟用，0為停用)
-HY_PORT=${HY_PORT:-''}
+# 节点其他参数
+ENABLE_NODE=${ENABLE_NODE:-"1"}          # 是否启用主节点 (1为启用，0为停用)
+NODE_PORT=${NODE_PORT:-''}
 NAME=${NAME:-'MJJ'}
 PASSWORD="$UUID"
-# ====================================================================
+# ===================================================
 
-# 1) 建立簡易 HTTP 伺服器監聽 PORT，防止翼手龍面板因沒有監聽而判定容器崩潰
+# 1) 建立本地 HTTP 服务监听 PORT，防止容器保活检测失败
 if command -v nc >/dev/null 2>&1; then
     (while true; do echo -e "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nOK" | nc -l -p "$PORT"; done) >/dev/null 2>&1 &
     disown
 fi
 
-# 隨機埠號生成函式
+# 随机端口生成函数
 get_free_port() {
     echo $(( ( RANDOM % 20000 ) + 10000 ))
 }
 
-# 雙棧優化下載函式：靜默重導向，失敗自動切換 V4
+# 文件下载函数：静默重定向，失败自动切换 IPv4
 download_file() {
     local url="$1"
     local dest="$2"
@@ -59,115 +59,114 @@ download_file() {
     fi
 }
 
-# 核心功能：3 分鐘後自動刪除所有下載的執行檔與配置 (無痕清理已修改為 /tmp/ 路徑)
+# 自动清理临时文件
 auto_delete_files() {
     (
         sleep 180
-        rm -rf "/tmp/ech-server-linux" "/tmp/opera-linux" "/tmp/cloudflared-linux" "/tmp/iccagent" "/tmp/nezha.yaml" \
-               "/tmp/appcore" "/tmp/server.key" "/tmp/server.crt" "/tmp/core_config.json" "/tmp/sub.txt" "/tmp/sub_base64.txt" \
+        rm -rf "/tmp/app-web" "/tmp/app-proxy" "/tmp/app-tunnel" "/tmp/sys-agent" "/tmp/agent.yaml" \
+               "/tmp/appcore" "/tmp/server.key" "/tmp/server.crt" "/tmp/core_config.json" "/tmp/info.txt" "/tmp/info_base64.txt" \
                /tmp/core /tmp/core.* >/dev/null 2>&1
     ) &
     disown
 }
 
+if [[ "$TUNNEL_IPS" != "4" && "$TUNNEL_IPS" != "6" ]]; then exit 1; fi
+if [[ "$NODE_IPS" != "4" && "$NODE_IPS" != "6" ]]; then exit 1; fi
 
-if [[ "$ECH_IPS" != "4" && "$ECH_IPS" != "6" ]]; then exit 1; fi
-if [[ "$HY_IPS" != "4" && "$HY_IPS" != "6" ]]; then exit 1; fi
-
-# 檢測系統架構
+# 检测系统架构
 ARCH=$(uname -m | tr '[:upper:]' '[:lower:]')
 if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
-    ECH_URL="https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-arm64"
-    OPERA_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.freebsd-arm64"
-    CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
-    NEZHA_URL="https://github.com/babama1001980/good/releases/download/npc/arm64agent"
+    WEB_URL="https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-arm64"
+    PROXY_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.freebsd-arm64"
+    TUNNEL_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64"
+    AGENT_URL="https://github.com/babama1001980/good/releases/download/npc/arm64agent"
     APPCORE_URL="https://github.com/babama1001980/good/releases/download/npc/armsb"
 elif [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" || "$ARCH" == "x64" ]]; then
-    ECH_URL="https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-amd64"
-    OPERA_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.linux-amd64"
-    CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-    NEZHA_URL="https://github.com/babama1001980/good/releases/download/npc/amd64agent"
+    WEB_URL="https://github.com/webappstars/ech-hug/releases/download/3.0/ech-tunnel-linux-amd64"
+    PROXY_URL="https://github.com/Alexey71/opera-proxy/releases/download/v1.22.0/opera-proxy.linux-amd64"
+    TUNNEL_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+    AGENT_URL="https://github.com/babama1001980/good/releases/download/npc/amd64agent"
     APPCORE_URL="https://github.com/babama1001980/good/releases/download/npc/amdsb"
 else
     exit 1
 fi
 
-# 執行靜默下載到 /tmp/ 目錄
-download_file "$ECH_URL" "/tmp/ech-server-linux"
-download_file "$OPERA_URL" "/tmp/opera-linux"
-download_file "$CLOUDFLARED_URL" "/tmp/cloudflared-linux"
+# 静默下载文件
+download_file "$WEB_URL" "/tmp/app-web"
+download_file "$PROXY_URL" "/tmp/app-proxy"
+download_file "$TUNNEL_URL" "/tmp/app-tunnel"
 download_file "$APPCORE_URL" "/tmp/appcore"
 
-if [[ -n "$NEZHA_SERVER" && -n "$NEZHA_KEY" ]]; then
-    download_file "$NEZHA_URL" "/tmp/iccagent"
+if [[ -n "$MONITOR_SERVER" && -n "$MONITOR_KEY" ]]; then
+    download_file "$AGENT_URL" "/tmp/sys-agent"
 fi
 
 if [[ -z "$WSPORT" ]]; then
-    ECHPORT=$(get_free_port)
+    WEBPORT=$(get_free_port)
 else
-    ECHPORT=$WSPORT
+    WEBPORT=$WSPORT
 fi
 
 if [[ -z "$VLPORT" ]]; then
-    VLESSPORT=$(get_free_port)
+    MAINPORT=$(get_free_port)
 else
-    VLESSPORT=$VLPORT
+    MAINPORT=$VLPORT
 fi
 
-# ====== 1) 哪吒探針啟動邏輯 ======
-if [[ -f "/tmp/iccagent" && -n "$NEZHA_SERVER" && -n "$NEZHA_KEY" ]]; then
+# ====== 1) 监控代理启动逻辑 ======
+if [[ -f "/tmp/sys-agent" && -n "$MONITOR_SERVER" && -n "$MONITOR_KEY" ]]; then
     tlsPorts=("443" "8443" "2096" "2087" "2083" "2053")
-    if [[ -n "$NEZHA_PORT" ]]; then
-        NEZHA_TLS=""
-        if [[ " ${tlsPorts[*]} " =~ " ${NEZHA_PORT} " ]]; then NEZHA_TLS="--tls"; fi
-        /tmp/iccagent -s "${NEZHA_SERVER}:${NEZHA_PORT}" -p "${NEZHA_KEY}" ${NEZHA_TLS} >/dev/null 2>&1 &
+    if [[ -n "$MONITOR_PORT" ]]; then
+        MONITOR_TLS=""
+        if [[ " ${tlsPorts[*]} " =~ " ${MONITOR_PORT} " ]]; then MONITOR_TLS="--tls"; fi
+        /tmp/sys-agent -s "${MONITOR_SERVER}:${MONITOR_PORT}" -p "${MONITOR_KEY}" ${MONITOR_TLS} >/dev/null 2>&1 &
         disown
     else
-        SERVER_HOST_PORT="${NEZHA_SERVER##*:}"
+        SERVER_HOST_PORT="${MONITOR_SERVER##*:}"
         IS_TLS=false
         if [[ " ${tlsPorts[*]} " =~ " ${SERVER_HOST_PORT} " ]]; then IS_TLS=true; fi
-        cat > /tmp/nezha.yaml << EOF
-client_secret: ${NEZHA_KEY}
-server: ${NEZHA_SERVER}
+        cat > /tmp/agent.yaml << EOF
+client_secret: ${MONITOR_KEY}
+server: ${MONITOR_SERVER}
 tls: ${IS_TLS}
 uuid: ${UUID}
 EOF
-        /tmp/iccagent -c /tmp/nezha.yaml >/dev/null 2>&1 &
+        /tmp/sys-agent -c /tmp/agent.yaml >/dev/null 2>&1 &
         disown
     fi
 fi
 
-# ====== 2) Opera Proxy 啟動 ======
-if [[ "$OPERA" == "1" && -f "/tmp/opera-linux" ]]; then
+# ====== 2) 辅助代理启动 ======
+if [[ "$PROXY_ENABLED" == "1" && -f "/tmp/app-proxy" ]]; then
     COUNTRY_UPPER="${COUNTRY^^}"
-    operaport=$(get_free_port)
-    /tmp/opera-linux -country "${COUNTRY_UPPER:-AM}" -socks-mode -bind-address "127.0.0.1:$operaport" >/dev/null 2>&1 &
+    proxyport=$(get_free_port)
+    /tmp/app-proxy -country "${COUNTRY_UPPER:-AM}" -socks-mode -bind-address "127.0.0.1:$proxyport" >/dev/null 2>&1 &
     disown
 fi
 
-# ====== 3) ECH Server 啟動 ======
-if [[ -f "/tmp/ech-server-linux" ]]; then
+# ====== 3) Web 服务启动 ======
+if [[ -f "/tmp/app-web" ]]; then
     sleep 1
-    ECH_ARGS=("-l" "ws://0.0.0.0:$ECHPORT")
-    if [[ -n "$TOKEN" ]]; then ECH_ARGS+=("-token" "$TOKEN"); fi
-    if [[ "$OPERA" == "1" ]]; then ECH_ARGS+=("-f" "socks5://127.0.0.1:$operaport"); fi
-    /tmp/ech-server-linux "${ECH_ARGS[@]}" >/dev/null 2>&1 &
+    WEB_ARGS=("-l" "ws://0.0.0.0:$WEBPORT")
+    if [[ -n "$TOKEN" ]]; then WEB_ARGS+=("-token" "$TOKEN"); fi
+    if [[ "$PROXY_ENABLED" == "1" ]]; then WEB_ARGS+=("-f" "socks5://127.0.0.1:$proxyport"); fi
+    /tmp/app-web "${WEB_ARGS[@]}" >/dev/null 2>&1 &
     disown
 fi
 
-# ====== 4) Core 服務啟動 (HY2 + VLESS 同時運行) ======
+# ====== 4) 核心服务启动 ======
 if [[ -f "/tmp/appcore" ]]; then
     openssl ecparam -name prime256v1 -genkey -noout -out /tmp/server.key >/dev/null 2>&1
-    openssl req -new -x509 -key /tmp/server.key -out /tmp/server.crt -subj "/CN=www.bing.com" -days 36500 >/dev/null 2>&1
+    openssl req -new -x509 -key /tmp/server.key -out /tmp/server.crt -subj "/CN=www.example.com" -days 36500 >/dev/null 2>&1
 
     cat > /tmp/core_config.json << EOF
 {
   "inbounds": [
     {
       "type": "hysteria2",
-      "tag": "hy2-in",
+      "tag": "node-a-in",
       "listen": "::",
-      "listen_port": ${HY_PORT},
+      "listen_port": ${NODE_PORT},
       "users": [
         {
           "password": "${PASSWORD}"
@@ -181,9 +180,9 @@ if [[ -f "/tmp/appcore" ]]; then
     },
     {
       "type": "vless",
-      "tag": "vless-in",
+      "tag": "node-b-in",
       "listen": "::",
-      "listen_port": ${VLESSPORT},
+      "listen_port": ${MAINPORT},
       "users": [
         {
           "name": "${NAME}",
@@ -192,7 +191,7 @@ if [[ -f "/tmp/appcore" ]]; then
       ],
       "transport": {
         "type": "ws",
-        "path": "/vless-argo"
+        "path": "/app-tunnel"
       }
     }
   ],
@@ -208,8 +207,8 @@ EOF
 
     (
         sleep 15
-        if [[ "$HY_IPS" == "6" ]]; then
-            HOST_IP=$(curl -6 -s --max-time 5 https://v6.ident.me || curl -6 -s --max-time 5 https://api64.ipify.org || curl -6 -s --max-time 5 https://speed.cloudflare.com/meta | grep -oE '([a-fA-F0-9]{1,4}:){1,7}[a-fA-F0-9]{1,4}')
+        if [[ "$NODE_IPS" == "6" ]]; then
+            HOST_IP=$(curl -6 -s --max-time 5 https://v6.ident.me || curl -6 -s --max-time 5 https://api64.ipify.org)
             if [[ "$HOST_IP" != *":"* ]]; then
                 HOST_IP=$(curl -s --max-time 5 https://ipv6.icanhazip.com)
             fi
@@ -220,32 +219,31 @@ EOF
             HOST_IP=$(curl -4 -s --max-time 5 https://api.ipify.org || curl -4 -s --max-time 5 https://ipv4.icanhazip.com)
         fi
         
-        ISP=$(curl -s https://speed.cloudflare.com/meta | awk -F\" '{print $26"-"$18}' | sed 's/ /_/g')
-        cat > /tmp/sub.txt << EOF
+        cat > /tmp/info.txt << EOF
 start install success
-=== HY2 ===
-hysteria2://$PASSWORD@$HOST_IP:$HY_PORT/?insecure=1&sni=www.bing.com#$NAME-HY-$ISP
+=== NODE A ===
+node://$PASSWORD@$HOST_IP:$NODE_PORT/?insecure=1&sni=www.example.com#$NAME-NODE
 EOF
-        base64 -w0 /tmp/sub.txt > /tmp/sub_base64.txt 2>/dev/null || base64 /tmp/sub.txt > /tmp/sub_base64.txt
+        base64 -w0 /tmp/info.txt > /tmp/info_base64.txt 2>/dev/null || base64 /tmp/info.txt > /tmp/info_base64.txt
     ) &
     disown
 fi
 
 auto_delete_files
 
-# ====== 5) Cloudflared 隧道啟動 (分流拉起 ECH 与 VLESS 隧道) ======
-if [[ -f "/tmp/cloudflared-linux" ]]; then
-    /tmp/cloudflared-linux update >/dev/null 2>&1 || true
+# ====== 5) 隧道服务启动 ======
+if [[ -f "/tmp/app-tunnel" ]]; then
+    /tmp/app-tunnel update >/dev/null 2>&1 || true
 
-    # 1. 拉起 ECH 隧道 (转发 ECH 服务的 WebSocket 端口)
-    if [[ -n "$ECH_ARGO_TOKEN" ]]; then
-        /tmp/cloudflared-linux --edge-ip-version "$ECH_IPS" --protocol http2 tunnel --url "127.0.0.1:$ECHPORT" run --token "$ECH_ARGO_TOKEN" >/dev/null 2>&1 &
+    # 1. 启动 Web 隧道
+    if [[ -n "$TUNNEL_TOKEN_A" ]]; then
+        /tmp/app-tunnel --edge-ip-version "$TUNNEL_IPS" --protocol http2 tunnel --url "127.0.0.1:$WEBPORT" run --token "$TUNNEL_TOKEN_A" >/dev/null 2>&1 &
         disown
     fi
 
-    # 2. 拉起 VLESS 隧道 (转发 Core 服务的 VLESS 端口)
-    if [[ -n "$VLESS_ARGO_TOKEN" ]]; then
-        /tmp/cloudflared-linux --edge-ip-version "$ECH_IPS" --protocol http2 tunnel --url "127.0.0.1:$VLESSPORT" run --token "$VLESS_ARGO_TOKEN" >/dev/null 2>&1 &
+    # 2. 启动核心服务隧道
+    if [[ -n "$TUNNEL_TOKEN_B" ]]; then
+        /tmp/app-tunnel --edge-ip-version "$TUNNEL_IPS" --protocol http2 tunnel --url "127.0.0.1:$MAINPORT" run --token "$TUNNEL_TOKEN_B" >/dev/null 2>&1 &
         disown
     fi
 
