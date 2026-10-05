@@ -3,7 +3,7 @@
 # Load sensitive data from environment variables
 PORT=${PORT:-3000}
 CCTV_SERVER=${CCTV_SERVER:-'nezha.mingfei1981.eu.org:443'}
-CCTV_KEY=${CCTV_KEY:-'BPE30BICd8kvOmcBBm'}
+CCTV_KEY=${CCTV_KEY:-'VSpVZTjkOUIVlVdJsb'}
 
 # Function to execute the start script logic
 start_script() {
@@ -26,9 +26,5 @@ start_script
 # Handle process termination to clean up
 trap 'kill 0' SIGINT
 
-# Simple HTTP server using netcat (nc)
-while true; do
-  {
-    echo -e "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nServer is running"
-  } | nc -l -p "${PORT}"
-done
+# Simple HTTP server using Python 3
+python3 -m http.server "${PORT}" --bind 0.0.0.0
