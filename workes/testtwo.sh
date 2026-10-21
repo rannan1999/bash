@@ -11,7 +11,7 @@ TUIC_PORT="${TUIC_PORT:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
 ARGO_AUTH="${ARGO_AUTH:-eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiMDg0MDUxYzctNDE5Yy00MTg1LTlhMTgtNWY2OWE1ZDMxYzg1IiwicyI6Ik16VmpNVGd4TURNdE1HVXpNQzAwTlRVM0xXSmxaakV0WkRjek5XVmhaV05rTkdFMiJ9}"
-ARGO_PROTOCOL="${ARGO_PROTOCOL:-quic}"
+ARGO_PROTOCOL="${ARGO_PROTOCOL:-auto}" # 优化：改为 auto 兼容 H2 和 H3
 ARGO_CONNECTIONS="${ARGO_CONNECTIONS:-1}"
 CFIP="${CFIP:-www.teamviewer.com}"
 DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$TUIC_PORT}}"
@@ -99,18 +99,15 @@ if [ -z "$TOTAL_RAM_MB" ] || [ "$TOTAL_RAM_MB" -eq 0 ]; then
     TOTAL_RAM_MB=128
 fi
 
+# 更加严格的低内存限制，控制总内存占用在 100M 以内
 if [ "$TOTAL_RAM_MB" -le 160 ]; then
-    CORE1_MEM="20MiB"; CORE2_MEM="20MiB"; TUNNEL_MEM="45MiB"; DYNAMIC_GOGC="400"; DYNAMIC_PROCS="1"
+    CORE1_MEM="15MiB"; CORE2_MEM="15MiB"; TUNNEL_MEM="30MiB"; DYNAMIC_GOGC="400"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 256 ]; then
-    CORE1_MEM="40MiB"; CORE2_MEM="40MiB"; TUNNEL_MEM="90MiB"; DYNAMIC_GOGC="250"; DYNAMIC_PROCS="1"
+    CORE1_MEM="25MiB"; CORE2_MEM="25MiB"; TUNNEL_MEM="50MiB"; DYNAMIC_GOGC="250"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 352 ]; then
-    CORE1_MEM="65MiB"; CORE2_MEM="65MiB"; TUNNEL_MEM="130MiB"; DYNAMIC_GOGC="300"; DYNAMIC_PROCS="1"
-elif [ "$TOTAL_RAM_MB" -lt 448 ]; then
-    CORE1_MEM="65MiB"; CORE2_MEM="65MiB"; TUNNEL_MEM="140MiB"; DYNAMIC_GOGC="220"; DYNAMIC_PROCS="1"
-elif [ "$TOTAL_RAM_MB" -lt 576 ]; then
-    CORE1_MEM="80MiB"; CORE2_MEM="80MiB"; TUNNEL_MEM="160MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="1"
+    CORE1_MEM="40MiB"; CORE2_MEM="40MiB"; TUNNEL_MEM="80MiB"; DYNAMIC_GOGC="300"; DYNAMIC_PROCS="1"
 else
-    CORE1_MEM="200MiB"; CORE2_MEM="200MiB"; TUNNEL_MEM="350MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="${GOMAXPROCS:-2}"
+    CORE1_MEM="50MiB"; CORE2_MEM="50MiB"; TUNNEL_MEM="100MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="1"
 fi
 
 export GODEBUG="madvdontneed=1,netdns=go,cgocheck=0"
@@ -230,21 +227,7 @@ if [ ! -f "$MONITOR_BIN" ]; then
 fi
 chmod 775 "$MONITOR_BIN" 2>/dev/null || true
 
-# ==================== 核心优化：复制到系统稳定临时目录，防止被3分钟清理误杀 ====================
-RUN_DIR="/tmp/serv_run_$(date +%s%N)"
-mkdir -p "$RUN_DIR"
-
-cp -f "$CORE1_BIN" "$RUN_DIR/singbox"
-cp -f "$CORE2_BIN" "$RUN_DIR/web"
-cp -f "$TUNNEL_BIN" "$RUN_DIR/bot"
-cp -f "$MONITOR_BIN" "$RUN_DIR/monitor"
-
-RUN_CORE1_BIN="$RUN_DIR/singbox"
-RUN_CORE2_BIN="$RUN_DIR/web"
-RUN_TUNNEL_BIN="$RUN_DIR/bot"
-RUN_MONITOR_BIN="$RUN_DIR/monitor"
-# =========================================================================================
-
+# 直接在原目录运行，不再复制到 /tmp，省去双倍内存占用
 GLOBAL_LINKS=""
 
 if [ "$ENABLE_DIRECT" = true ]; then
@@ -281,12 +264,11 @@ if [ "$ENABLE_DIRECT" = true ]; then
   "route": { "auto_detect_interface": true, "final": "direct" }
 }
 EOF
-    cp -f "$FILE_PATH/config1.json" "$RUN_DIR/config1.json"
 
     (
         export GOMEMLIMIT="$CORE1_MEM"
         while true; do
-            "$RUN_CORE1_BIN" run -c "$RUN_DIR/config1.json" >/dev/null 2>&1 || true
+            "$CORE1_BIN" run -c "$FILE_PATH/config1.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -316,12 +298,11 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
   "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
 }
 EOF
-    cp -f "$FILE_PATH/config2.json" "$RUN_DIR/config2.json"
 
     (
         export GOMEMLIMIT="$CORE2_MEM"
         while true; do
-            "$RUN_CORE2_BIN" run -c "$RUN_DIR/config2.json" >/dev/null 2>&1 || true
+            "$CORE2_BIN" run -c "$FILE_PATH/config2.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -331,7 +312,7 @@ EOF
     (
         export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
-            "$RUN_TUNNEL_BIN" tunnel \
+            "$TUNNEL_BIN" tunnel \
                 --no-autoupdate \
                 --retries 5 \
                 --grace-period 1s \
@@ -356,7 +337,7 @@ fi
 
 (
     while true; do
-        "$RUN_MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
+        "$MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
         sleep 3
     done
 ) >/dev/null 2>&1 &
@@ -366,13 +347,13 @@ if [ -n "$GLOBAL_LINKS" ]; then
     echo -e "$BASE64_SUB" > "$URL_FILE_PATH"
 fi
 
-# 3分钟后仅清理本地下载目录和订阅文件，保留后台运行的服务进程与运行目录
+# 3分钟后仅清理本地临时文件目录与订阅文件，后台核心进程和内存中的二进制正常运行不受影响
 cleanup_files_only() {
     rm -rf "$FILE_PATH" "$URL_FILE_PATH" >/dev/null 2>&1 || true
 }
 
 trap cleanup_files_only SIGINT SIGTERM
 
-# 主进程睡眠 180 秒（3分钟）后，删除安装文件和 sub.txt，但后台核心继续稳定运行
+# 主进程睡眠 180 秒（3分钟）后清理安装目录和 sub.txt，后台服务保持在线
 sleep 180
 cleanup_files_only
