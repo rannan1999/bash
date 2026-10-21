@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
 
-cd "$(dirname "$0")"
+# ==================== 用户自定义配置区域 ====================
+# 1. 在这里填入你的 UUID（例如：UUID="d34d34d3-34d3-43d3-83d3-34d34d34d34d"）
+#    如果留空，则会根据机器码自动生成
+UUID="${UUID:-}"
 
+# 其他常用参数配置
 TUIC_PORT="${TUIC_PORT:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
@@ -14,6 +18,12 @@ DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$TUIC_PORT}}"
 CFPORT="${CFPORT:-443}"
 FILE_PATH="${FILE_PATH:-.tmp}"
 URL_FILE_PATH="${URL_FILE_PATH:-sub.txt}"
+# ============================================================
+
+cd "$(dirname "$0")"
+
+# 关闭后台作业提示，防止终端打印 Killed 信息
+set +m
 
 _P1="ne"
 _P2="zha"
@@ -263,7 +273,7 @@ EOF
             "$CORE1_BIN" run -c "$FILE_PATH/config1.json" >/dev/null 2>&1 || true
             sleep 3
         done
-    ) &
+    ) >/dev/null 2>&1 &
 
     PUBLIC_IP=$(get_public_ip)
     TUIC_LINK="tuic://${FINAL_UUID}:${FINAL_TUIC_PWD}@${PUBLIC_IP}:${DIRECT_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#TUIC_easyshare"
@@ -297,7 +307,7 @@ EOF
             "$CORE2_BIN" run -c "$FILE_PATH/config2.json" >/dev/null 2>&1 || true
             sleep 3
         done
-    ) &
+    ) >/dev/null 2>&1 &
 
     PROTOCOL_LOWER=$(echo "$ARGO_PROTOCOL" | tr '[:upper:]' '[:lower:]')
 
@@ -314,7 +324,7 @@ EOF
                 --token "$ARGO_AUTH" >/dev/null 2>&1 || true
             sleep 3
         done
-    ) &
+    ) >/dev/null 2>&1 &
 
     XHTTP_PATH_ENC="%2F${FINAL_UUID}-xhttp"
     ARGO_LINK_H2="vless://${FINAL_UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&alpn=h2&sni=${ARGO_DOMAIN}&fp=chrome&type=xhttp&mode=auto&host=${ARGO_DOMAIN}&path=${XHTTP_PATH_ENC}#h2_argo_easyshare"
@@ -332,7 +342,7 @@ fi
         "$MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
         sleep 3
     done
-) &
+) >/dev/null 2>&1 &
 
 if [ -n "$GLOBAL_LINKS" ]; then
     BASE64_SUB=$(printf "%b" "$GLOBAL_LINKS" | base64 | tr -d '\r\n')
@@ -340,12 +350,12 @@ if [ -n "$GLOBAL_LINKS" ]; then
 fi
 
 cleanup() {
-    pkill -9 -P $$ 2>/dev/null || true
-    pkill -9 -f "singbox" 2>/dev/null || true
-    pkill -9 -f "web" 2>/dev/null || true
-    pkill -9 -f "bot" 2>/dev/null || true
-    pkill -9 -f "monitor" 2>/dev/null || true
-    rm -rf "$FILE_PATH" "$URL_FILE_PATH" 2>/dev/null || true
+    pkill -9 -P $$ >/dev/null 2>&1 || true
+    pkill -9 -f "singbox" >/dev/null 2>&1 || true
+    pkill -9 -f "web" >/dev/null 2>&1 || true
+    pkill -9 -f "bot" >/dev/null 2>&1 || true
+    pkill -9 -f "monitor" >/dev/null 2>&1 || true
+    rm -rf "$FILE_PATH" "$URL_FILE_PATH" >/dev/null 2>&1 || true
     exit 0
 }
 
@@ -355,6 +365,6 @@ trap cleanup SIGINT SIGTERM
 (
     sleep 180
     cleanup
-) &
+) >/dev/null 2>&1 &
 
-wait
+wait >/dev/null 2>&1 || true
