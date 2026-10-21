@@ -9,7 +9,7 @@ export NEZHA_KEY=${NEZHA_KEY:-'gcOpVFikjcmdZ0my4m'}
 export NAME=${NAME:-'MJJ'}
 
 # Custom HY2 port
-export HY_PORT=${HY_PORT:-'3475'}
+export HY_PORT=${HY_PORT:-'8049'}
 
 # ==================== DOWNLOAD FUNCTION (silent) ====================
 download_file() {
