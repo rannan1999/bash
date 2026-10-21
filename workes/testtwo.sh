@@ -351,6 +351,7 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+# 延时 3 分钟（180秒）后自动执行清理并退出
 (
     sleep 180
     cleanup
