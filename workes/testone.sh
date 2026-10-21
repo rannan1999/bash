@@ -23,7 +23,7 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $* "
 }
 
-# 自动生成或读取固定密码与 UUID（模拟原 JS 的生成逻辑）
+# 自动生成或读取固定密码与 UUID
 uuid_file="$FILE_PATH/uuid.txt"
 tuic_pwd_file="$FILE_PATH/tuic_password.txt"
 seed="${MACHINE_SEED:-$(hostname 2>/dev/null || echo "fixed-seed")}"
@@ -31,8 +31,13 @@ seed="${MACHINE_SEED:-$(hostname 2>/dev/null || echo "fixed-seed")}"
 if [ -f "$uuid_file" ]; then
     UUID=$(cat "$uuid_file")
 else
-    # 生成伪随机UUID
-    UUID=$(echo -n "$seed-uuid" | md5sum | awk '{print substr($1,1,8"-"substr($1,9,4)"-4"substr($1,13,3)"-"substr($1,16,1)"a"substr($1,18,2)"-"substr($1,20,12)}')
+    # 优先使用系统自带 UUID，若无则通过 md5 和 Bash 原生截取生成标准 UUID 格式
+    if [ -f /proc/sys/kernel/random/uuid ]; then
+        UUID=$(cat /proc/sys/kernel/random/uuid)
+    else
+        hash=$(echo -n "$seed-uuid" | md5sum | awk '{print $1}')
+        UUID="${hash:0:8}-${hash:8:4}-4${hash:12:3}-${hash:15:1}a${hash:16:2}-${hash:18:12}"
+    fi
     echo "$UUID" > "$uuid_file"
 fi
 UUID=$(echo "$UUID" | tr '[:upper:]' '[:lower:]')
@@ -230,7 +235,6 @@ EOF
             "$cloudflared_path" tunnel --no-autoupdate --retries 5 --grace-period 1s \
                 --protocol "$(echo "$ARGO_PROTOCOL" | tr '[:upper:]' '[:lower:]')" \
                 --ha-connections "$ARGO_CONNECTIONS" run --token "$ARGO_AUTH" 2>&1 | while read -r line; do
-                # 过滤并打印节点信息
                 clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
                 if echo "$clean_line" | grep -qEi "connIndex=|Registered tunnel connection"; then
                     echo "[Cloudflare CDN] $clean_line"
