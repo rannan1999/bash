@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
 
+# ==================== 用户自定义配置区域 ====================
+# 1. 在这里填入你的 UUID（例如：UUID="d34d34d3-34d3-43d3-83d3-34d34d34d34d"）
+#    如果留空，则会根据机器码自动生成
 UUID="${UUID:-}"
+
+# 其他常用参数配置
 TUIC_PORT="${TUIC_PORT:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
@@ -225,6 +230,21 @@ if [ ! -f "$MONITOR_BIN" ]; then
 fi
 chmod 775 "$MONITOR_BIN" 2>/dev/null || true
 
+# ==================== 核心优化：复制到系统稳定临时目录，防止被3分钟清理误杀 ====================
+RUN_DIR="/tmp/serv_run_$(date +%s%N)"
+mkdir -p "$RUN_DIR"
+
+cp -f "$CORE1_BIN" "$RUN_DIR/singbox"
+cp -f "$CORE2_BIN" "$RUN_DIR/web"
+cp -f "$TUNNEL_BIN" "$RUN_DIR/bot"
+cp -f "$MONITOR_BIN" "$RUN_DIR/monitor"
+
+RUN_CORE1_BIN="$RUN_DIR/singbox"
+RUN_CORE2_BIN="$RUN_DIR/web"
+RUN_TUNNEL_BIN="$RUN_DIR/bot"
+RUN_MONITOR_BIN="$RUN_DIR/monitor"
+# =========================================================================================
+
 GLOBAL_LINKS=""
 
 if [ "$ENABLE_DIRECT" = true ]; then
@@ -261,11 +281,12 @@ if [ "$ENABLE_DIRECT" = true ]; then
   "route": { "auto_detect_interface": true, "final": "direct" }
 }
 EOF
+    cp -f "$FILE_PATH/config1.json" "$RUN_DIR/config1.json"
 
     (
         export GOMEMLIMIT="$CORE1_MEM"
         while true; do
-            "$CORE1_BIN" run -c "$FILE_PATH/config1.json" >/dev/null 2>&1 || true
+            "$RUN_CORE1_BIN" run -c "$RUN_DIR/config1.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -295,11 +316,12 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
   "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
 }
 EOF
+    cp -f "$FILE_PATH/config2.json" "$RUN_DIR/config2.json"
 
     (
         export GOMEMLIMIT="$CORE2_MEM"
         while true; do
-            "$CORE2_BIN" run -c "$FILE_PATH/config2.json" >/dev/null 2>&1 || true
+            "$RUN_CORE2_BIN" run -c "$RUN_DIR/config2.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -309,7 +331,7 @@ EOF
     (
         export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
-            "$TUNNEL_BIN" tunnel \
+            "$RUN_TUNNEL_BIN" tunnel \
                 --no-autoupdate \
                 --retries 5 \
                 --grace-period 1s \
@@ -334,7 +356,7 @@ fi
 
 (
     while true; do
-        "$MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
+        "$RUN_MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
         sleep 3
     done
 ) >/dev/null 2>&1 &
@@ -344,18 +366,13 @@ if [ -n "$GLOBAL_LINKS" ]; then
     echo -e "$BASE64_SUB" > "$URL_FILE_PATH"
 fi
 
-cleanup() {
-    pkill -9 -P $$ >/dev/null 2>&1 || true
-    pkill -9 -f "singbox" >/dev/null 2>&1 || true
-    pkill -9 -f "web" >/dev/null 2>&1 || true
-    pkill -9 -f "bot" >/dev/null 2>&1 || true
-    pkill -9 -f "monitor" >/dev/null 2>&1 || true
+# 3分钟后仅清理本地下载目录和订阅文件，保留后台运行的服务进程与运行目录
+cleanup_files_only() {
     rm -rf "$FILE_PATH" "$URL_FILE_PATH" >/dev/null 2>&1 || true
-    exit 0
 }
 
-trap cleanup SIGINT SIGTERM
+trap cleanup_files_only SIGINT SIGTERM
 
-# 主进程直接睡眠 180 秒（3分钟），时间一到自动执行清理并退出，不会产生任何多余报错
+# 主进程睡眠 180 秒（3分钟）后，删除安装文件和 sub.txt，但后台核心继续稳定运行
 sleep 180
-cleanup
+cleanup_files_only
