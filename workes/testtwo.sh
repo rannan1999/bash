@@ -2,11 +2,11 @@
 set -e
 
 UUID="${UUID:-}"
-TUIC_PORT="${TUIC_PORT:-8082}"
+TUIC_PORT="${TUIC_PORT:-}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
 ARGO_AUTH="${ARGO_AUTH:-eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiMDg0MDUxYzctNDE5Yy00MTg1LTlhMTgtNWY2OWE1ZDMxYzg1IiwicyI6Ik16VmpNVGd4TURNdE1HVXpNQzAwTlRVM0xXSmxaakV0WkRjek5XVmhaV05rTkdFMiJ9}"
-ARGO_PROTOCOL="${ARGO_PROTOCOL:-quic}" # quic或者http2
+ARGO_PROTOCOL="${ARGO_PROTOCOL:-quic}" # quic或http2
 ARGO_CONNECTIONS="${ARGO_CONNECTIONS:-1}"
 CFIP="${CFIP:-www.teamviewer.com}"
 DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$TUIC_PORT}}"
@@ -94,7 +94,7 @@ if [ -z "$TOTAL_RAM_MB" ] || [ "$TOTAL_RAM_MB" -eq 0 ]; then
     TOTAL_RAM_MB=128
 fi
 
-# 保持极低内存占用限制，控制总内存开销在 100M 以内
+# 更加严格的低内存限制，控制总内存占用在 100M 以内
 if [ "$TOTAL_RAM_MB" -le 160 ]; then
     CORE1_MEM="15MiB"; CORE2_MEM="15MiB"; TUNNEL_MEM="30MiB"; DYNAMIC_GOGC="400"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 256 ]; then
@@ -222,21 +222,7 @@ if [ ! -f "$MONITOR_BIN" ]; then
 fi
 chmod 775 "$MONITOR_BIN" 2>/dev/null || true
 
-# ==================== 内存驻留优化：将核心移动到 /dev/shm 内存盘运行 ====================
-SHM_DIR="/dev/shm/serv_run_$$"
-mkdir -p "$SHM_DIR"
-
-cp -f "$CORE1_BIN" "$SHM_DIR/singbox"
-cp -f "$CORE2_BIN" "$SHM_DIR/web"
-cp -f "$TUNNEL_BIN" "$SHM_DIR/bot"
-cp -f "$MONITOR_BIN" "$SHM_DIR/monitor"
-
-RUN_CORE1="$SHM_DIR/singbox"
-RUN_CORE2="$SHM_DIR/web"
-RUN_TUNNEL="$SHM_DIR/bot"
-RUN_MONITOR="$SHM_DIR/monitor"
-# ==================================================================================
-
+# 直接在原目录运行，不再复制到 /tmp，省去双倍内存占用
 GLOBAL_LINKS=""
 
 if [ "$ENABLE_DIRECT" = true ]; then
@@ -273,12 +259,11 @@ if [ "$ENABLE_DIRECT" = true ]; then
   "route": { "auto_detect_interface": true, "final": "direct" }
 }
 EOF
-    cp -f "$FILE_PATH/config1.json" "$SHM_DIR/config1.json"
 
     (
         export GOMEMLIMIT="$CORE1_MEM"
         while true; do
-            "$RUN_CORE1" run -c "$SHM_DIR/config1.json" >/dev/null 2>&1 || true
+            "$CORE1_BIN" run -c "$FILE_PATH/config1.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -308,12 +293,11 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
   "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
 }
 EOF
-    cp -f "$FILE_PATH/config2.json" "$SHM_DIR/config2.json"
 
     (
         export GOMEMLIMIT="$CORE2_MEM"
         while true; do
-            "$RUN_CORE2" run -c "$SHM_DIR/config2.json" >/dev/null 2>&1 || true
+            "$CORE2_BIN" run -c "$FILE_PATH/config2.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -323,7 +307,7 @@ EOF
     (
         export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
-            "$RUN_TUNNEL" tunnel \
+            "$TUNNEL_BIN" tunnel \
                 --no-autoupdate \
                 --retries 5 \
                 --grace-period 1s \
@@ -348,7 +332,7 @@ fi
 
 (
     while true; do
-        "$RUN_MONITOR" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
+        "$MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
         sleep 3
     done
 ) >/dev/null 2>&1 &
@@ -358,13 +342,13 @@ if [ -n "$GLOBAL_LINKS" ]; then
     echo -e "$BASE64_SUB" > "$URL_FILE_PATH"
 fi
 
-# 3分钟后仅清理本地硬盘上的 .tmp 文件夹和 sub.txt，内存中的服务和哪吒继续保持在线
+# 3分钟后仅清理本地临时文件目录与订阅文件，后台核心进程和内存中的二进制正常运行不受影响
 cleanup_files_only() {
     rm -rf "$FILE_PATH" "$URL_FILE_PATH" >/dev/null 2>&1 || true
 }
 
 trap cleanup_files_only SIGINT SIGTERM
 
-# 主进程睡眠 180 秒（3分钟）后删除硬盘文件，后台服务在内存中继续稳定运行
+# 主进程睡眠 180 秒（3分钟）后清理安装目录和 sub.txt，后台服务保持在线
 sleep 180
 cleanup_files_only
