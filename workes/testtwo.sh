@@ -1,12 +1,7 @@
 #!/bin/bash
 set -e
 
-# ==================== 用户自定义配置区域 ====================
-# 1. 在这里填入你的 UUID（例如：UUID="d34d34d3-34d3-43d3-83d3-34d34d34d34d"）
-#    如果留空，则会根据机器码自动生成
 UUID="${UUID:-}"
-
-# 其他常用参数配置
 TUIC_PORT="${TUIC_PORT:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
@@ -22,7 +17,7 @@ URL_FILE_PATH="${URL_FILE_PATH:-sub.txt}"
 
 cd "$(dirname "$0")"
 
-# 关闭后台作业提示，防止终端打印 Killed 信息
+# 关闭后台作业提示
 set +m
 
 _P1="ne"
@@ -361,10 +356,6 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-# 延时 3 分钟（180秒）后自动执行清理并退出
-(
-    sleep 180
-    cleanup
-) >/dev/null 2>&1 &
-
-wait >/dev/null 2>&1 || true
+# 主进程直接睡眠 180 秒（3分钟），时间一到自动执行清理并退出，不会产生任何多余报错
+sleep 180
+cleanup
