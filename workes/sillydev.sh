@@ -5,7 +5,7 @@ export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 export PASSWORD="$UUID"
 export NEZHA_SERVER=${NEZHA_SERVER:-'nezha.mingfei1981.eu.org'}
 export NEZHA_PORT=${NEZHA_PORT:-'443'}
-export NEZHA_KEY=${NEZHA_KEY:-'gcOpVFikjcmdZ0my4m'}
+export NEZHA_KEY=${NEZHA_KEY:-'pdsioixxZbwpxy5hk2'}
 export NAME=${NAME:-'MJJ'}
 
 # Custom HY2 port
