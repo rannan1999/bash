@@ -5,20 +5,20 @@ set -e
 cd "$(dirname "$0")"
 
 # ========== 默认环境变量设置 (可从外部传入覆盖) ==========
-TUIC_PORT="${TUIC_PORT:-}"
+PORT_A="${PORT_A:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
 ARGO_AUTH="${ARGO_AUTH:-eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiMDg0MDUxYzctNDE5Yy00MTg1LTlhMTgtNWY2OWE1ZDMxYzg1IiwicyI6Ik16VmpNVGd4TURNdE1HVXpNQzAwTlRVM0xXSmxaakV0WkRjek5XVmhaV05rTkdFMiJ9}"
 ARGO_PROTOCOL="${ARGO_PROTOCOL:-quic}"
 ARGO_CONNECTIONS="${ARGO_CONNECTIONS:-1}"
 CFIP="${CFIP:-www.teamviewer.com}"
-DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$TUIC_PORT}}"
+DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$PORT_A}}"
 CFPORT="${CFPORT:-443}"
 FILE_PATH="${FILE_PATH:-.tmp}"
 URL_FILE_PATH="${URL_FILE_PATH:-sub.txt}"
 
-SINGBOX_VER="1.11.4"
-XRAY_VER="25.1.30"
+CORE_A_VER="1.11.4"
+CORE_B_VER="25.1.30"
 
 # 创建运行临时目录
 mkdir -p "$FILE_PATH"
@@ -29,11 +29,11 @@ log() {
 }
 
 # ========== 清理现有运行进程 ==========
-pkill -9 -f "sing-box run" 2>/dev/null || true
-pkill -9 -f "xray run" 2>/dev/null || true
-pkill -9 -f "cloudflared tunnel" 2>/dev/null || true
+pkill -9 -f "core_a run" 2>/dev/null || true
+pkill -9 -f "core_b run" 2>/dev/null || true
+pkill -9 -f "edge_tunnel" 2>/dev/null || true
 
-# 释放 TUIC 直连端口
+# 释放直连端口
 if [ -n "$DIRECT_PORT" ] && [ "$DIRECT_PORT" != "0" ]; then
     fuser -k -9 "${DIRECT_PORT}/udp" 2>/dev/null || true
 fi
@@ -51,7 +51,7 @@ if [ -n "$ARGO_PORT" ] && [ "$ARGO_PORT" != "0" ] && [ -n "$ARGO_DOMAIN" ] && [ 
 fi
 
 if [ "$ENABLE_DIRECT" = false ] && [ "$ENABLE_ARGO_FIXED" = false ]; then
-    log "[退出] 缺失变量 (TUIC_PORT) + Argo 固定隧道 (PORT/DOMAIN/AUTH)。放弃所有部署。"
+    log "[退出] 缺失变量 (PORT_A) + 隧道固定端口/域名/密钥。放弃所有部署。"
     exit 0
 fi
 
@@ -59,14 +59,14 @@ fi
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64|amd64)
-        SINGBOX_ARCH="amd64"
-        XRAY_ARCH="64"
-        CLOUDFLARED_ARCH="amd64"
+        CORE_A_ARCH="amd64"
+        CORE_B_ARCH="64"
+        TUNNEL_ARCH="amd64"
         ;;
     aarch64|arm64|armv8*)
-        SINGBOX_ARCH="arm64"
-        XRAY_ARCH="arm64-v8a"
-        CLOUDFLARED_ARCH="arm64"
+        CORE_A_ARCH="arm64"
+        CORE_B_ARCH="arm64-v8a"
+        TUNNEL_ARCH="arm64"
         ;;
     *)
         log "[错误] 未知或不支持的架构: $ARCH"
@@ -93,17 +93,17 @@ if [ -z "$TOTAL_RAM_MB" ] || [ "$TOTAL_RAM_MB" -eq 0 ]; then
 fi
 
 if [ "$TOTAL_RAM_MB" -le 160 ]; then
-    SINGBOX_MEM="20MiB"; XRAY_MEM="20MiB"; CLOUDFLARED_MEM="45MiB"; DYNAMIC_GOGC="400"; DYNAMIC_PROCS="1"
+    CORE_A_MEM="20MiB"; CORE_B_MEM="20MiB"; TUNNEL_MEM="45MiB"; DYNAMIC_GOGC="400"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 256 ]; then
-    SINGBOX_MEM="40MiB"; XRAY_MEM="40MiB"; CLOUDFLARED_MEM="90MiB"; DYNAMIC_GOGC="250"; DYNAMIC_PROCS="1"
+    CORE_A_MEM="40MiB"; CORE_B_MEM="40MiB"; TUNNEL_MEM="90MiB"; DYNAMIC_GOGC="250"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 352 ]; then
-    SINGBOX_MEM="65MiB"; XRAY_MEM="65MiB"; CLOUDFLARED_MEM="130MiB"; DYNAMIC_GOGC="300"; DYNAMIC_PROCS="1"
+    CORE_A_MEM="65MiB"; CORE_B_MEM="65MiB"; TUNNEL_MEM="130MiB"; DYNAMIC_GOGC="300"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 448 ]; then
-    SINGBOX_MEM="65MiB"; XRAY_MEM="65MiB"; CLOUDFLARED_MEM="140MiB"; DYNAMIC_GOGC="220"; DYNAMIC_PROCS="1"
+    CORE_A_MEM="65MiB"; CORE_B_MEM="65MiB"; TUNNEL_MEM="140MiB"; DYNAMIC_GOGC="220"; DYNAMIC_PROCS="1"
 elif [ "$TOTAL_RAM_MB" -lt 576 ]; then
-    SINGBOX_MEM="80MiB"; XRAY_MEM="80MiB"; CLOUDFLARED_MEM="160MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="1"
+    CORE_A_MEM="80MiB"; CORE_B_MEM="80MiB"; TUNNEL_MEM="160MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="1"
 else
-    SINGBOX_MEM="200MiB"; XRAY_MEM="200MiB"; CLOUDFLARED_MEM="350MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="${GOMAXPROCS:-2}"
+    CORE_A_MEM="200MiB"; CORE_B_MEM="200MiB"; TUNNEL_MEM="350MiB"; DYNAMIC_GOGC="200"; DYNAMIC_PROCS="${GOMAXPROCS:-2}"
 fi
 
 export GODEBUG="madvdontneed=1,netdns=go,cgocheck=0"
@@ -115,17 +115,17 @@ log "[INFO] 检测到系统内存: ${TOTAL_RAM_MB}MB | GOGC=${DYNAMIC_GOGC} | GO
 # ========== 生成密钥/密码/UUID ==========
 SEED="${MACHINE_SEED:-$(hostname 2>/dev/null || echo 'fixed-seed')}"
 
-# 生成 SHA256 (32字节 hex) 密码
-if [ -n "$TUIC_PASSWORD" ]; then
-    FINAL_TUIC_PWD="$TUIC_PASSWORD"
-elif [ -f "$FILE_PATH/tuic_password.txt" ]; then
-    FINAL_TUIC_PWD=$(cat "$FILE_PATH/tuic_password.txt" | tr -d '\r\n')
+# 生成密码
+if [ -n "$PROTOCOL_PASSWORD" ]; then
+    FINAL_PROTOCOL_PWD="$PROTOCOL_PASSWORD"
+elif [ -f "$FILE_PATH/protocol_password.txt" ]; then
+    FINAL_PROTOCOL_PWD=$(cat "$FILE_PATH/protocol_password.txt" | tr -d '\r\n')
 else
-    FINAL_TUIC_PWD=$(printf "%s-tuic" "$SEED" | sha256sum | awk '{print $1}' | cut -c 1-32)
-    echo -n "$FINAL_TUIC_PWD" > "$FILE_PATH/tuic_password.txt"
+    FINAL_PROTOCOL_PWD=$(printf "%s-proto" "$SEED" | sha256sum | awk '{print $1}' | cut -c 1-32)
+    echo -n "$FINAL_PROTOCOL_PWD" > "$FILE_PATH/protocol_password.txt"
 fi
 
-# 生成 MD5 映射的标准 UUID v4
+# 生成标准 UUID v4
 if [ -n "$UUID" ]; then
     FINAL_UUID=$(echo "$UUID" | tr '[:upper:]' '[:lower:]')
 elif [ -f "$FILE_PATH/uuid.txt" ]; then
@@ -199,70 +199,69 @@ download_file() {
     curl -sSL "$url" -o "$output"
 }
 
-SINGBOX_BIN="$FILE_PATH/singbox"
-XRAY_BIN="$FILE_PATH/web"
-CLOUDFLARED_BIN="$FILE_PATH/bot"
+CORE_A_BIN="$FILE_PATH/core_a"
+CORE_B_BIN="$FILE_PATH/core_b"
+TUNNEL_BIN="$FILE_PATH/edge_tunnel"
 
-# 1. 下载 Sing-box
-if [ ! -f "$SINGBOX_BIN" ]; then
-    log "正在下载 Sing-box..."
-    SINGBOX_URL="https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VER}/sing-box-${SINGBOX_VER}-linux-${SINGBOX_ARCH}.tar.gz"
-    download_file "$SINGBOX_URL" "$FILE_PATH/singbox.tar.gz"
-    tar -xzf "$FILE_PATH/singbox.tar.gz" -C "$FILE_PATH" --wildcards "*/sing-box" --strip-components=1 2>/dev/null || \
-    tar -xzf "$FILE_PATH/singbox.tar.gz" -C "$FILE_PATH" sing-box 2>/dev/null || true
+# 1. 下载核心 A
+if [ ! -f "$CORE_A_BIN" ]; then
+    log "正在下载核心组件 A..."
+    CORE_A_URL="https://github.com/SagerNet/sing-box/releases/download/v${CORE_A_VER}/sing-box-${CORE_A_VER}-linux-${CORE_A_ARCH}.tar.gz"
+    download_file "$CORE_A_URL" "$FILE_PATH/core_a.tar.gz"
+    tar -xzf "$FILE_PATH/core_a.tar.gz" -C "$FILE_PATH" --wildcards "*/sing-box" --strip-components=1 2>/dev/null || \
+    tar -xzf "$FILE_PATH/core_a.tar.gz" -C "$FILE_PATH" sing-box 2>/dev/null || true
     if [ -f "$FILE_PATH/sing-box" ]; then
-        mv "$FILE_PATH/sing-box" "$SINGBOX_BIN"
+        mv "$FILE_PATH/sing-box" "$CORE_A_BIN"
     fi
-    rm -f "$FILE_PATH/singbox.tar.gz"
+    rm -f "$FILE_PATH/core_a.tar.gz"
 fi
-chmod 775 "$SINGBOX_BIN" 2>/dev/null || true
+chmod 775 "$CORE_A_BIN" 2>/dev/null || true
 
-# 2. 下载 Xray-core
-if [ ! -f "$XRAY_BIN" ]; then
-    log "正在下载 Xray-core..."
-    XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VER}/Xray-linux-${XRAY_ARCH}.zip"
-    download_file "$XRAY_URL" "$FILE_PATH/xray.zip"
+# 2. 下载核心 B
+if [ ! -f "$CORE_B_BIN" ]; then
+    log "正在下载核心组件 B..."
+    CORE_B_URL="https://github.com/XTLS/Xray-core/releases/download/v${CORE_B_VER}/Xray-linux-${CORE_B_ARCH}.zip"
+    download_file "$CORE_B_URL" "$FILE_PATH/core_b.zip"
     
-    # 尝试解压
     EXTRACTED=false
     if command -v unzip >/dev/null 2>&1; then
-        unzip -o "$FILE_PATH/xray.zip" xray -d "$FILE_PATH" >/dev/null 2>&1 && EXTRACTED=true
+        unzip -o "$FILE_PATH/core_b.zip" xray -d "$FILE_PATH" >/dev/null 2>&1 && EXTRACTED=true
     fi
     if [ "$EXTRACTED" = false ]; then
         PY_CMD=$(command -v python3 || command -v python || true)
         if [ -n "$PY_CMD" ]; then
-            $PY_CMD -c "import zipfile, sys; z=zipfile.ZipFile(sys.argv[1]); z.extract('xray', sys.argv[2])" "$FILE_PATH/xray.zip" "$FILE_PATH" 2>/dev/null && EXTRACTED=true
+            $PY_CMD -c "import zipfile, sys; z=zipfile.ZipFile(sys.argv[1]); z.extract('xray', sys.argv[2])" "$FILE_PATH/core_b.zip" "$FILE_PATH" 2>/dev/null && EXTRACTED=true
         fi
     fi
 
     if [ -f "$FILE_PATH/xray" ]; then
-        mv "$FILE_PATH/xray" "$XRAY_BIN"
+        mv "$FILE_PATH/xray" "$CORE_B_BIN"
     else
-        log "[错误] 无法解压 Xray-core，系统缺失 unzip 命令或 Python 环境！"
+        log "[错误] 无法解压核心组件 B，系统缺失 unzip 命令或 Python 环境！"
         exit 1
     fi
-    rm -f "$FILE_PATH/xray.zip"
+    rm -f "$FILE_PATH/core_b.zip"
 fi
-chmod 775 "$XRAY_BIN" 2>/dev/null || true
+chmod 775 "$CORE_B_BIN" 2>/dev/null || true
 
-# 3. 下载 Cloudflared
-if [ ! -f "$CLOUDFLARED_BIN" ]; then
-    log "正在下载 Cloudflared..."
-    CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CLOUDFLARED_ARCH}"
-    download_file "$CLOUDFLARED_URL" "$CLOUDFLARED_BIN"
+# 3. 下载隧道客户端
+if [ ! -f "$TUNNEL_BIN" ]; then
+    log "正在下载隧道组件..."
+    TUNNEL_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${TUNNEL_ARCH}"
+    download_file "$TUNNEL_URL" "$TUNNEL_BIN"
 fi
-chmod 775 "$CLOUDFLARED_BIN" 2>/dev/null || true
+chmod 775 "$TUNNEL_BIN" 2>/dev/null || true
 
 # ========== 启动子进程 & 保活逻辑 ==========
 GLOBAL_LINKS=""
 
-# --- 部署 Sing-box (TUIC 直连) ---
+# --- 部署核心 A (直连) ---
 if [ "$ENABLE_DIRECT" = true ]; then
     CERT_PATH="$FILE_PATH/cert.pem"
     KEY_PATH="$FILE_PATH/private.key"
     generate_certificates "$KEY_PATH" "$CERT_PATH"
 
-    cat <<EOF > "$FILE_PATH/singbox_config.json"
+    cat <<EOF > "$FILE_PATH/config_a.json"
 {
   "log": { "level": "panic" },
   "dns": {
@@ -274,10 +273,10 @@ if [ "$ENABLE_DIRECT" = true ]; then
   "inbounds": [
     {
       "type": "tuic",
-      "tag": "tuic-in",
+      "tag": "transport-in",
       "listen": "::",
       "listen_port": ${DIRECT_PORT},
-      "users": [ { "uuid": "${FINAL_UUID}", "password": "${FINAL_TUIC_PWD}" } ],
+      "users": [ { "uuid": "${FINAL_UUID}", "password": "${FINAL_PROTOCOL_PWD}" } ],
       "congestion_control": "bbr",
       "tls": {
         "enabled": true,
@@ -292,28 +291,28 @@ if [ "$ENABLE_DIRECT" = true ]; then
 }
 EOF
 
-    log "[初始化] 已加载 Sing-box TUIC 直连入站，监听端口: ${DIRECT_PORT}"
+    log "[初始化] 已加载直连服务入站，监听端口: ${DIRECT_PORT}"
 
-    # 后台保活 Sing-box
+    # 后台保活核心 A
     (
-        export GOMEMLIMIT="$SINGBOX_MEM"
+        export GOMEMLIMIT="$CORE_A_MEM"
         while true; do
-            "$SINGBOX_BIN" run -c "$FILE_PATH/singbox_config.json" >/dev/null 2>&1 || true
-            log "[警告] Sing-box 意外退出，3秒后自动拉起..."
+            "$CORE_A_BIN" run -c "$FILE_PATH/config_a.json" >/dev/null 2>&1 || true
+            log "[警告] 直连服务意外退出，3秒后自动拉起..."
             sleep 3
         done
     ) &
 
     PUBLIC_IP=$(get_public_ip)
-    TUIC_LINK="tuic://${FINAL_UUID}:${FINAL_TUIC_PWD}@${PUBLIC_IP}:${DIRECT_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#TUIC_easyshare"
-    GLOBAL_LINKS="${TUIC_LINK}"
+    PROTOCOL_LINK="tuic://${FINAL_UUID}:${FINAL_PROTOCOL_PWD}@${PUBLIC_IP}:${DIRECT_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#Protocol_easyshare"
+    GLOBAL_LINKS="${PROTOCOL_LINK}"
 else
-    log "[初始化] 缺失变量 TUIC_PORT，已放弃部署 TUIC 直连。"
+    log "[初始化] 缺失变量 PORT_A，已放弃部署直连服务。"
 fi
 
-# --- 部署 Xray + Cloudflared (Argo 固定隧道) ---
+# --- 部署核心 B + 隧道 (固定隧道) ---
 if [ "$ENABLE_ARGO_FIXED" = true ]; then
-    cat <<EOF > "$FILE_PATH/xray_config.json"
+    cat <<EOF > "$FILE_PATH/config_b.json"
 {
   "log": { "loglevel": "none" },
   "inbounds": [
@@ -333,26 +332,26 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
 }
 EOF
 
-    log "[初始化] 已加载 Xray Argo xHTTP 回源入站，监听端口: ${ARGO_PORT}"
+    log "[初始化] 已加载回源入站，监听端口: ${ARGO_PORT}"
 
-    # 后台保活 Xray
+    # 后台保活核心 B
     (
-        export GOMEMLIMIT="$XRAY_MEM"
+        export GOMEMLIMIT="$CORE_B_MEM"
         while true; do
-            "$XRAY_BIN" run -c "$FILE_PATH/xray_config.json" >/dev/null 2>&1 || true
-            log "[警告] Xray 意外退出，3秒后自动拉起..."
+            "$CORE_B_BIN" run -c "$FILE_PATH/config_b.json" >/dev/null 2>&1 || true
+            log "[警告] 回源服务意外退出，3秒后自动拉起..."
             sleep 3
         done
     ) &
 
-    log "[Argo] 检测到完整变量 (PORT+DOMAIN+AUTH)，启动固定隧道..."
+    log "[隧道] 检测到完整变量，启动固定隧道..."
     PROTOCOL_LOWER=$(echo "$ARGO_PROTOCOL" | tr '[:upper:]' '[:lower:]')
 
-    # 后台保活 Cloudflared 并实时解析连通边缘节点
+    # 后台保活隧道进程并实时解析边缘节点
     (
-        export GOMEMLIMIT="$CLOUDFLARED_MEM"
+        export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
-            "$CLOUDFLARED_BIN" tunnel \
+            "$TUNNEL_BIN" tunnel \
                 --no-autoupdate \
                 --retries 5 \
                 --grace-period 1s \
@@ -361,7 +360,6 @@ EOF
                 run \
                 --token "$ARGO_AUTH" 2>&1 | while read -r line; do
                 
-                # 正则解析边缘节点信息 (例如 INF Registered tunnel connection connIndex=0 location=HKG)
                 if echo "$line" | grep -iqE "Registered tunnel connection|location="; then
                     LOC=$(echo "$line" | grep -oE '(location|region)["=:\s]+[A-Za-z0-9]{3,4}' | awk -F'["=:\s]+' '{print $2}' | tr '[:lower:]' '[:upper:]')
                     if [ -z "$LOC" ]; then
@@ -369,20 +367,18 @@ EOF
                     fi
                     
                     if [ -n "$LOC" ]; then
-                        # 过滤纯数字节点号
                         IATA_CODE=$(echo "$LOC" | sed 's/[0-9]//g')
                         CN_NAME=$(get_country_name "$IATA_CODE")
-                        log "[Cloudflare CDN] 已连接边缘节点：${LOC}（${CN_NAME}） | 协议：${PROTOCOL_LOWER}"
+                        log "[CDN] 已连接边缘节点：${LOC}（${CN_NAME}） | 协议：${PROTOCOL_LOWER}"
                     fi
                 fi
             done || true
 
-            log "[警告] cloudflared 进程意外退出，3秒后自动重连..."
+            log "[警告] 隧道进程意外退出，3秒后自动重连..."
             sleep 3
         done
     ) &
 
-    # 拼装 VLESS xHTTP 链接 (URL Code 格式编码 Path)
     XHTTP_PATH_ENC="%2F${FINAL_UUID}-xhttp"
     ARGO_LINK_H2="vless://${FINAL_UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&alpn=h2&sni=${ARGO_DOMAIN}&fp=chrome&type=xhttp&mode=auto&host=${ARGO_DOMAIN}&path=${XHTTP_PATH_ENC}#h2_argo_easyshare"
     ARGO_LINK_H3="vless://${FINAL_UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&alpn=h3&sni=${ARGO_DOMAIN}&fp=chrome&type=xhttp&mode=auto&host=${ARGO_DOMAIN}&path=${XHTTP_PATH_ENC}#h3_argo_easyshare"
@@ -393,7 +389,7 @@ EOF
         GLOBAL_LINKS="${ARGO_LINK_H2}\r\n${ARGO_LINK_H3}"
     fi
 else
-    log "[初始化] 缺失变量 (PORT/DOMAIN/AUTH)，已放弃部署 Argo 固定隧道。"
+    log "[初始化] 缺失变量，已放弃部署固定隧道。"
 fi
 
 # ========== 输出 Base64 订阅文本 ==========
@@ -408,11 +404,11 @@ fi
 
 # ========== 拦截 SIGINT / SIGTERM 信号优雅退出 ==========
 cleanup() {
-    log "\n[INFO] 正在关闭所有节点后台进程..."
+    log "\n[INFO] 正在关闭所有后台进程..."
     pkill -9 -P $$ 2>/dev/null || true
-    pkill -9 -f "singbox" 2>/dev/null || true
-    pkill -9 -f "web" 2>/dev/null || true
-    pkill -9 -f "bot" 2>/dev/null || true
+    pkill -9 -f "core_a" 2>/dev/null || true
+    pkill -9 -f "core_b" 2>/dev/null || true
+    pkill -9 -f "edge_tunnel" 2>/dev/null || true
     exit 0
 }
 
