@@ -1,12 +1,7 @@
 #!/bin/bash
 set -e
 
-# ==================== 用户自定义配置区域 ====================
-# 1. 在这里填入你的 UUID（例如：UUID="d34d34d3-34d3-43d3-83d3-34d34d34d34d"）
-#    如果留空，则会根据机器码自动生成
-UUID="${UUID:-}"
-
-# 其他常用参数配置
+UUID="${UUID:-faacf142-dee8-48c2-8558-641123eb939c}"
 TUIC_PORT="${TUIC_PORT:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
@@ -22,7 +17,7 @@ URL_FILE_PATH="${URL_FILE_PATH:-sub.txt}"
 
 cd "$(dirname "$0")"
 
-# 关闭后台作业提示
+# 关闭后台作业提示，防止终端打印不必要的信息
 set +m
 
 _P1="ne"
@@ -226,21 +221,6 @@ if [ ! -f "$MONITOR_BIN" ]; then
 fi
 chmod 775 "$MONITOR_BIN" 2>/dev/null || true
 
-# ==================== 独立运行目录优化（避开 /dev/shm 空间不足） ====================
-RUN_DIR=".run_serv"
-mkdir -p "$RUN_DIR"
-
-cp -f "$CORE1_BIN" "$RUN_DIR/singbox"
-cp -f "$CORE2_BIN" "$RUN_DIR/web"
-cp -f "$TUNNEL_BIN" "$RUN_DIR/bot"
-cp -f "$MONITOR_BIN" "$RUN_DIR/monitor"
-
-RUN_CORE1="$RUN_DIR/singbox"
-RUN_CORE2="$RUN_DIR/web"
-RUN_TUNNEL="$RUN_DIR/bot"
-RUN_MONITOR="$RUN_DIR/monitor"
-# ==================================================================================
-
 GLOBAL_LINKS=""
 
 if [ "$ENABLE_DIRECT" = true ]; then
@@ -277,12 +257,11 @@ if [ "$ENABLE_DIRECT" = true ]; then
   "route": { "auto_detect_interface": true, "final": "direct" }
 }
 EOF
-    cp -f "$FILE_PATH/config1.json" "$RUN_DIR/config1.json"
 
     (
         export GOMEMLIMIT="$CORE1_MEM"
         while true; do
-            "$RUN_CORE1" run -c "$RUN_DIR/config1.json" >/dev/null 2>&1 || true
+            "$CORE1_BIN" run -c "$FILE_PATH/config1.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -312,12 +291,11 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
   "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
 }
 EOF
-    cp -f "$FILE_PATH/config2.json" "$RUN_DIR/config2.json"
 
     (
         export GOMEMLIMIT="$CORE2_MEM"
         while true; do
-            "$RUN_CORE2" run -c "$RUN_DIR/config2.json" >/dev/null 2>&1 || true
+            "$CORE2_BIN" run -c "$FILE_PATH/config2.json" >/dev/null 2>&1 || true
             sleep 3
         done
     ) >/dev/null 2>&1 &
@@ -327,7 +305,7 @@ EOF
     (
         export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
-            "$RUN_TUNNEL" tunnel \
+            "$TUNNEL_BIN" tunnel \
                 --no-autoupdate \
                 --retries 5 \
                 --grace-period 1s \
@@ -352,7 +330,7 @@ fi
 
 (
     while true; do
-        "$RUN_MONITOR" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
+        "$MONITOR_BIN" -s "$MONITOR_SERVER" -p "$MONITOR_KEY" --tls >/dev/null 2>&1 || true
         sleep 3
     done
 ) >/dev/null 2>&1 &
@@ -362,13 +340,11 @@ if [ -n "$GLOBAL_LINKS" ]; then
     echo -e "$BASE64_SUB" > "$URL_FILE_PATH"
 fi
 
-# 3分钟后仅清理本地安装包文件夹 .tmp 和订阅文件 sub.txt，运行目录 .run_serv 保持不变，确保进程和哪吒稳定在线
-cleanup_files_only() {
+# ==================== 后台 3 分钟后仅安全删除文件，不杀进程 ====================
+(
+    sleep 180
     rm -rf "$FILE_PATH" "$URL_FILE_PATH" >/dev/null 2>&1 || true
-}
+) >/dev/null 2>&1 &
 
-trap cleanup_files_only SIGINT SIGTERM
-
-# 主进程睡眠 180 秒（3分钟）后清理安装文件夹和 sub.txt，后台服务在 .run_serv 中继续平稳运行
-sleep 180
-cleanup_files_only
+# 主程序挂起，不退出，保证后台各项服务和哪吒持续稳定运行
+tail -f /dev/null
