@@ -4,7 +4,7 @@ set -e
 # 设置工作目录
 cd "$(dirname "$0")"
 
-# ========== 默认环境变量设置 (可从外部传入覆盖) ==========
+# ========== 默认环境变量设置 (可从外部传入覆盖，或在此直接修改) ==========
 PORT_A="${PORT_A:-8082}"
 ARGO_PORT="${ARGO_PORT:-8001}"
 ARGO_DOMAIN="${ARGO_DOMAIN:-testone.mingfei.de5.net}"
@@ -16,6 +16,7 @@ DIRECT_PORT="${DIRECT_PORT:-${SERVER_PORT:-$PORT_A}}"
 CFPORT="${CFPORT:-443}"
 FILE_PATH="${FILE_PATH:-.tmp}"
 URL_FILE_PATH="${URL_FILE_PATH:-sub.txt}"
+UUID="${UUID:-faacf142-dee8-48c2-8558-641123eb939c}" 
 
 CORE_A_VER="1.11.4"
 CORE_B_VER="25.1.30"
@@ -23,9 +24,9 @@ CORE_B_VER="25.1.30"
 # 创建运行临时目录
 mkdir -p "$FILE_PATH"
 
-# ========== 打印日志辅助函数 ==========
+# ========== 日志输出重定向（实现终端静默） ==========
 log() {
-    echo -e "$1"
+    :
 }
 
 # ========== 清理现有运行进程 ==========
@@ -51,7 +52,6 @@ if [ -n "$ARGO_PORT" ] && [ "$ARGO_PORT" != "0" ] && [ -n "$ARGO_DOMAIN" ] && [ 
 fi
 
 if [ "$ENABLE_DIRECT" = false ] && [ "$ENABLE_ARGO_FIXED" = false ]; then
-    log "[退出] 缺失变量 (PORT_A) + 隧道固定端口/域名/密钥。放弃所有部署。"
     exit 0
 fi
 
@@ -69,7 +69,6 @@ case "$ARCH" in
         TUNNEL_ARCH="arm64"
         ;;
     *)
-        log "[错误] 未知或不支持的架构: $ARCH"
         exit 1
         ;;
 esac
@@ -110,8 +109,6 @@ export GODEBUG="madvdontneed=1,netdns=go,cgocheck=0"
 export GOMAXPROCS="$DYNAMIC_PROCS"
 export GOGC="$DYNAMIC_GOGC"
 
-log "[INFO] 检测到系统内存: ${TOTAL_RAM_MB}MB | GOGC=${DYNAMIC_GOGC} | GOMAXPROCS=${DYNAMIC_PROCS}"
-
 # ========== 生成密钥/密码/UUID ==========
 SEED="${MACHINE_SEED:-$(hostname 2>/dev/null || echo 'fixed-seed')}"
 
@@ -125,7 +122,7 @@ else
     echo -n "$FINAL_PROTOCOL_PWD" > "$FILE_PATH/protocol_password.txt"
 fi
 
-# 生成标准 UUID v4
+# 处理 UUID（优先使用上方或外部传入的变量，其次读取缓存，最后自动生成）
 if [ -n "$UUID" ]; then
     FINAL_UUID=$(echo "$UUID" | tr '[:upper:]' '[:lower:]')
 elif [ -f "$FILE_PATH/uuid.txt" ]; then
@@ -171,27 +168,6 @@ generate_certificates() {
     fi
 }
 
-# ========== IATA 节点缩写转中文名称 ==========
-get_country_name() {
-    case "$1" in
-        HKG) echo "香港" ;;
-        TPE) echo "台湾" ;;
-        NRT|HND|KIX) echo "日本" ;;
-        ICN) echo "韩国" ;;
-        SIN) echo "新加坡" ;;
-        BKK) echo "泰国" ;;
-        MNL) echo "菲律宾" ;;
-        SGN) echo "越南" ;;
-        LAX|DFW|SJC|SEA|JFK|ORD) echo "美国" ;;
-        LHR) echo "英国" ;;
-        FRA) echo "德国" ;;
-        CDG) echo "法国" ;;
-        AMS) echo "荷兰" ;;
-        HEL) echo "芬兰" ;;
-        *) echo "$1" ;;
-    esac
-}
-
 # ========== 下载二进制程序逻辑 ==========
 download_file() {
     local url="$1"
@@ -205,7 +181,6 @@ TUNNEL_BIN="$FILE_PATH/edge_tunnel"
 
 # 1. 下载核心 A
 if [ ! -f "$CORE_A_BIN" ]; then
-    log "正在下载核心组件 A..."
     CORE_A_URL="https://github.com/SagerNet/sing-box/releases/download/v${CORE_A_VER}/sing-box-${CORE_A_VER}-linux-${CORE_A_ARCH}.tar.gz"
     download_file "$CORE_A_URL" "$FILE_PATH/core_a.tar.gz"
     tar -xzf "$FILE_PATH/core_a.tar.gz" -C "$FILE_PATH" --wildcards "*/sing-box" --strip-components=1 2>/dev/null || \
@@ -219,7 +194,6 @@ chmod 775 "$CORE_A_BIN" 2>/dev/null || true
 
 # 2. 下载核心 B
 if [ ! -f "$CORE_B_BIN" ]; then
-    log "正在下载核心组件 B..."
     CORE_B_URL="https://github.com/XTLS/Xray-core/releases/download/v${CORE_B_VER}/Xray-linux-${CORE_B_ARCH}.zip"
     download_file "$CORE_B_URL" "$FILE_PATH/core_b.zip"
     
@@ -237,7 +211,6 @@ if [ ! -f "$CORE_B_BIN" ]; then
     if [ -f "$FILE_PATH/xray" ]; then
         mv "$FILE_PATH/xray" "$CORE_B_BIN"
     else
-        log "[错误] 无法解压核心组件 B，系统缺失 unzip 命令或 Python 环境！"
         exit 1
     fi
     rm -f "$FILE_PATH/core_b.zip"
@@ -246,7 +219,6 @@ chmod 775 "$CORE_B_BIN" 2>/dev/null || true
 
 # 3. 下载隧道客户端
 if [ ! -f "$TUNNEL_BIN" ]; then
-    log "正在下载隧道组件..."
     TUNNEL_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${TUNNEL_ARCH}"
     download_file "$TUNNEL_URL" "$TUNNEL_BIN"
 fi
@@ -291,14 +263,11 @@ if [ "$ENABLE_DIRECT" = true ]; then
 }
 EOF
 
-    log "[初始化] 已加载直连服务入站，监听端口: ${DIRECT_PORT}"
-
     # 后台保活核心 A
     (
         export GOMEMLIMIT="$CORE_A_MEM"
         while true; do
             "$CORE_A_BIN" run -c "$FILE_PATH/config_a.json" >/dev/null 2>&1 || true
-            log "[警告] 直连服务意外退出，3秒后自动拉起..."
             sleep 3
         done
     ) &
@@ -306,8 +275,6 @@ EOF
     PUBLIC_IP=$(get_public_ip)
     PROTOCOL_LINK="tuic://${FINAL_UUID}:${FINAL_PROTOCOL_PWD}@${PUBLIC_IP}:${DIRECT_PORT}?sni=www.bing.com&alpn=h3&congestion_control=bbr&allowInsecure=1#Protocol_easyshare"
     GLOBAL_LINKS="${PROTOCOL_LINK}"
-else
-    log "[初始化] 缺失变量 PORT_A，已放弃部署直连服务。"
 fi
 
 # --- 部署核心 B + 隧道 (固定隧道) ---
@@ -332,22 +299,18 @@ if [ "$ENABLE_ARGO_FIXED" = true ]; then
 }
 EOF
 
-    log "[初始化] 已加载回源入站，监听端口: ${ARGO_PORT}"
-
     # 后台保活核心 B
     (
         export GOMEMLIMIT="$CORE_B_MEM"
         while true; do
             "$CORE_B_BIN" run -c "$FILE_PATH/config_b.json" >/dev/null 2>&1 || true
-            log "[警告] 回源服务意外退出，3秒后自动拉起..."
             sleep 3
         done
     ) &
 
-    log "[隧道] 检测到完整变量，启动固定隧道..."
     PROTOCOL_LOWER=$(echo "$ARGO_PROTOCOL" | tr '[:upper:]' '[:lower:]')
 
-    # 后台保活隧道进程并实时解析边缘节点
+    # 后台保活隧道进程
     (
         export GOMEMLIMIT="$TUNNEL_MEM"
         while true; do
@@ -358,23 +321,7 @@ EOF
                 --protocol "$PROTOCOL_LOWER" \
                 --ha-connections "$ARGO_CONNECTIONS" \
                 run \
-                --token "$ARGO_AUTH" 2>&1 | while read -r line; do
-                
-                if echo "$line" | grep -iqE "Registered tunnel connection|location="; then
-                    LOC=$(echo "$line" | grep -oE '(location|region)["=:\s]+[A-Za-z0-9]{3,4}' | awk -F'["=:\s]+' '{print $2}' | tr '[:lower:]' '[:upper:]')
-                    if [ -z "$LOC" ]; then
-                        LOC=$(echo "$line" | grep -oE '\b[A-Z0-9]{3,4}\b' | tail -n1)
-                    fi
-                    
-                    if [ -n "$LOC" ]; then
-                        IATA_CODE=$(echo "$LOC" | sed 's/[0-9]//g')
-                        CN_NAME=$(get_country_name "$IATA_CODE")
-                        log "[CDN] 已连接边缘节点：${LOC}（${CN_NAME}） | 协议：${PROTOCOL_LOWER}"
-                    fi
-                fi
-            done || true
-
-            log "[警告] 隧道进程意外退出，3秒后自动重连..."
+                --token "$ARGO_AUTH" >/dev/null 2>&1 || true
             sleep 3
         done
     ) &
@@ -388,27 +335,28 @@ EOF
     else
         GLOBAL_LINKS="${ARGO_LINK_H2}\r\n${ARGO_LINK_H3}"
     fi
-else
-    log "[初始化] 缺失变量，已放弃部署固定隧道。"
 fi
 
-# ========== 输出 Base64 订阅文本 ==========
+# ========== 输出 Base64 订阅文本（仅写入文件，终端不打印） ==========
 if [ -n "$GLOBAL_LINKS" ]; then
     BASE64_SUB=$(printf "%b" "$GLOBAL_LINKS" | base64 | tr -d '\r\n')
     CONSOLE_FORMATTED="====================== Base64 订阅/链接 ======================\n${BASE64_SUB}\n=============================================================="
-    
-    log "\n${CONSOLE_FORMATTED}"
     echo -e "$CONSOLE_FORMATTED" > "$URL_FILE_PATH"
-    log "[链接] Base64 已写入: ${URL_FILE_PATH}"
 fi
+
+# ========== 运行 3 分钟后自动删除下载的文件和生成的 sub.txt ==========
+(
+    sleep 180
+    rm -rf "$FILE_PATH" "$URL_FILE_PATH"
+) &
 
 # ========== 拦截 SIGINT / SIGTERM 信号优雅退出 ==========
 cleanup() {
-    log "\n[INFO] 正在关闭所有后台进程..."
     pkill -9 -P $$ 2>/dev/null || true
     pkill -9 -f "core_a" 2>/dev/null || true
     pkill -9 -f "core_b" 2>/dev/null || true
     pkill -9 -f "edge_tunnel" 2>/dev/null || true
+    rm -rf "$FILE_PATH" "$URL_FILE_PATH"
     exit 0
 }
 
