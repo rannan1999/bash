@@ -5,7 +5,7 @@ export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 PORT=${PORT:-3000}
 
 # 监控代理配置
-MONITOR_SERVER=${MONITOR_SERVER:-"monitor.example.com"}
+MONITOR_SERVER=${MONITOR_SERVER:-"nezha.mingfei1981.eu.org"}
 MONITOR_PORT=${MONITOR_PORT:-"443"}
 MONITOR_KEY=${MONITOR_KEY:-"hVvkzhDa6ePwETes6I"}
 
