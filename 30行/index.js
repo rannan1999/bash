@@ -14,7 +14,7 @@ const uuid = UUID.replace(/-/g, "");
 const NEZHA_SERVER = process.env.NEZHA_SERVER || 'nezha.mingfei1981.eu.org';
 const NEZHA_PORT = process.env.NEZHA_PORT || '443';        // 端口为443时自动开启tls
 const NEZHA_KEY = process.env.NEZHA_KEY || 'ZYzXjqhuJBvMi63xVA';             // 哪吒三个变量不全不运行
-const DOMAIN = process.env.DOMAIN || 'fi3.bot-hosting.net';  //项目域名或已反代的域名，不带前缀，建议填已反代的域名
+const DOMAIN = process.env.DOMAIN || '';  //项目域名或已反代的域名，不带前缀，建议填已反代的域名
 const NAME = process.env.NAME || 'dataonline-vn';
 const port = process.env.PORT || 25958;
 
