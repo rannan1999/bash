@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>守护绿色家园 - 保护环境，人人有责</title>
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --secondary-color: #81c784;
+            --bg-color: #f1f8e9;
+            --text-color: #333333;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            text-align: center;
+            padding: 4rem 1rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+            font-size: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .stats {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 3rem 1rem;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 3rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .stat-item h4 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            background-color: #1b5e20;
+            color: white;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>守护绿色家园 🌿</h1>
+        <p>地球是人类共同的唯一家园。保护环境，从点滴做起，为子孙后代留下一片蓝天碧C与清流。</p>
+    </header>
+
+    <div class="container">
+        <h2 class="section-title">我们面临的环境挑战</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>🌡️ 气候变化</h3>
+                <p>温室气体排放导致全球气温持续上升，极冰融化、极端天气频发，严重威胁生态平衡与人类生存环境。</p>
+            </div>
+            <div class="card">
+                <h3>🌊 海洋污染</h3>
+                <p>每年有数百万吨塑料垃圾进入海洋，不仅破坏海洋生态，更通过食物链对生物多样性及人类健康造成潜在危害。</p>
+            </div>
+            <div class="card">
+                <h3>🌳 森林锐减</h3>
+                <p>森林大面积砍伐导致生物栖息地丧失、水土流失加剧，极大地削弱了地球吸纳二氧化碳的自然能力。</p>
+            </div>
+        </div>
+
+        <div class="stats">
+            <h2>绿色行动，刻不容缓</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h4>100%</h4>
+                    <p>可再生能源转型目标</p>
+                </div>
+                <div class="stat-item">
+                    <h4>减碳</h4>
+                    <p>低碳生活，绿色出行</p>
+                </div>
+                <div class="stat-item">
+                    <h4>分类</h4>
+                    <p>资源循环，垃圾分类</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-title">你可以做些什么？</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>🚲 绿色出行</h3>
+                <p>尽量选择步行、骑自行车或乘坐公共交通工具，减少私家车碳排放。</p>
+            </div>
+            <div class="card">
+                <h3>♻️ 循环利用</h3>
+                <p>践行垃圾分类，减少一次性塑料制品的使用，让物品物尽其用。</p>
+            </div>
+            <div class="card">
+                <h3>💡 节约资源</h3>
+                <p>随手关灯、节约用水，培养绿色消费和可持续的生活习惯。</p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 绿色家园环保倡议 | 保护环境，人人有责</p>
+    </footer>
+
+</body>
+</html>
