@@ -4,9 +4,9 @@
 export UUID=${UUID:-'faacf142-dee8-48c2-8558-641123eb939c'}
 export NEZHA_SERVER=${NEZHA_SERVER:-'nezha.mingfei1981.eu.org'}
 export NEZHA_PORT=${NEZHA_PORT:-'443'}
-export NEZHA_KEY=${NEZHA_KEY:-'pdsioixxZbwpxy5hk2'}
-export ARGO_DOMAIN=${ARGO_DOMAIN:-'sillydev01.prosinecki.hidns.co'}
-export ARGO_AUTH=${ARGO_AUTH:-'eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiYzc3NmE0N2QtZDZjMC00MWZkLWFlNjMtMTExN2VmNWM3M2RmIiwicyI6Ik5ESXdOVFF5TnpjdE9Ea3dOUzAwWkRFMkxUZzNPVGd0Tmpsa1pEWmhOR1JqT0dWaSJ9'}
+export NEZHA_KEY=${NEZHA_KEY:-'tVOIvHnIf4wpeuBSOP'}
+export ARGO_DOMAIN=${ARGO_DOMAIN:-'sillydev00.mingfei.de5.net'}
+export ARGO_AUTH=${ARGO_AUTH:-'eyJhIjoiNjgyNWI4YTZjODBhYWQxODlmYWI5ZWEwMDI5YzY2NjgiLCJ0IjoiYWY5ZTk1ODQtZmI1Mi00ZjE4LTllNzEtNWUyNTdjOWNkMWJhIiwicyI6Ill6RXpPRGN5TjJVdFl6VTJNUzAwTm1Jd0xUbGlabU10WlRZeVpqTXpZMlEzWlRjeCJ9'}
 export CFIP=${CFIP:-'jd.bp.cloudns.ch'}
 export CFPORT=${CFPORT:-'443'}
 export NAME=${NAME:-'MJJ'}
